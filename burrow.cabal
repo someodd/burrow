@@ -1,0 +1,115 @@
+cabal-version:       3.0
+
+-- The name of the package.
+name:                burrow
+
+-- The package version.  See the Haskell package versioning policy (PVP)
+-- for standards guiding when and how versions should be incremented.
+-- https://pvp.haskell.org
+-- PVP summary:      +-+------- breaking API changes
+--                   | | +----- non-breaking API additions
+--                   | | | +--- code changes with no API change
+version:             0.1.0.0
+
+-- A short (one-line) description of the package.
+synopsis:            Build gopherholes.
+
+-- A longer description of the package.
+description:
+  Pong written in Gloss which uses spin as its primary mechanic.
+
+-- URL for the project homepage or repository.
+homepage:            https://github.com/hyperrealgopher/burrow
+
+-- A URL where users can report bugs.
+bug-reports:         https://github.com/hyperrealgopher/burrow/issues
+
+-- The license under which the package is released.
+license:             GPL-3.0-only
+
+-- The file containing the license text.
+license-file:        LICENSE
+
+-- The package author(s).
+author:              Hyperreal Gopher
+
+-- An email address to which users can send suggestions, bug reports, and
+-- patches.
+maintainer:          hyperrealgopher@protonmail.ch
+
+-- A copyright notice.
+-- copyright:
+
+category:            Games
+
+-- Extra files to be distributed with the package, such as examples or a
+-- README.
+extra-source-files:
+  README.md
+  CHANGELOG.md
+
+common shared-properties
+
+  -- NOTE: THIS SHOULD BE FINE ON EVERYTHING...
+  -- ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror -O2
+  -- ghc-options: -threaded -rtsopts -with-rtsopts=-N
+
+  build-depends:
+    base                 >=4.7 && <5,
+    text,
+    parsec,
+    word-wrap,
+    table-layout==0.9.0.2,
+    split,
+    bytestring,
+    containers,
+    mustache,
+    filepattern,
+    directory,
+    unordered-containers,
+    filepath,
+    optparse-applicative,
+    commonmark
+
+  -- LANGUAGE extensions used by modules in this package.
+  other-extensions:    OverloadedStrings
+
+  -- Base language which the package is written in.
+  default-language:    Haskell2010
+
+
+executable burrow
+  import: shared-properties
+
+  -- .hs or .lhs file containing the Main module.
+  main-is:             Main.hs
+
+  -- Modules included in this executable, other than Main.
+  other-modules:
+
+  -- Directories containing source files.
+  hs-source-dirs:      app
+
+  build-depends:       burrow
+
+library
+  -- Modules exported by the library.
+  import: shared-properties
+
+  -- Other library packages from which modules are imported.
+  exposed-modules:
+    TextUtils
+    TextUtils.Headings
+    Markdown.ToGopherMenu
+    Markdown.ToTextFile
+    Markdown.Common
+    Mustache
+    Build
+
+  -- Modules included in this library but not exported.
+  -- other-modules:
+
+  -- Directories containing source files.
+  hs-source-dirs:      src
+
+
