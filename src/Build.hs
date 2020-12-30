@@ -57,6 +57,8 @@ filesToParse sourceDirectory = do
   pure $ fmap (\x -> (x, determineType x)) filesMatching
 
 
+dataForMustache = [("title", Mtype.String "My Gopherhole"), ("justify2", overText justify2), ("justify", overText justify'), ("columnate2", overText columnate2)]
+
 -- FIXME: need to have the .mustache extensions removed from .txt and the .md.mustache extensions
 -- removed from menus--maybe they should just be .gophermenu if the name is "index.md.mustache?" and
 -- the --spacecookie flag is passed?
@@ -65,7 +67,6 @@ filesToParse sourceDirectory = do
 parseFile :: FilePath -> FilePath -> Bool -> FileToParse -> IO ()
 parseFile sourceDirectory destinationDirectory spaceCookie (filePath, parseType) = do
   let filePathIncludingSourceDirectory = sourceDirectory ++ filePath
-      dataForMustache = [("title", Mtype.String "My Gopherhole"), ("justify2", overText justify2), ("justify", overText justify')]
 
   case matchPartial filePath of
     Just (templateToUse, extension) -> do

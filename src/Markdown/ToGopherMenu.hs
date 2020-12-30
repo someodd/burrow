@@ -66,7 +66,7 @@ instance Show GopherLine where
   show (GopherNewLine) = ""
   show (GopherCompleteInfoLine t) = T.unpack ("i" <> t)
   show (GopherIncompleteInfoLine t) = T.unpack t
-  show (GopherLinkLine t) = T.unpack ("####" <> t)-- or something lol
+  show (GopherLinkLine t) = T.unpack t-- or something lol
 
 
 instance Semigroup (GopherLine) where
@@ -168,7 +168,7 @@ parseBlock ils = error . show $ ils
 instance IsInline (GopherMenu) => IsBlock (GopherMenu) (GopherMenu) where
   -- paragraph should not prefix with 'i' if it's a paragraph link...
   -- this is why even the link gets prefixed with 'i' when it shouldn't... how do you avoid this?
-  paragraph ils = ils
+  paragraph (GopherBlock ils) = GopherBlock ([GopherNewLine] ++ ils ++ [GopherNewLine])
   plain (GopherBlock ils) = GopherBlock [GopherIncompleteInfoLine "~~~~"]
   thematicBreak = GopherBlock [GopherIncompleteInfoLine "------------------"]
   blockQuote bs = bs
