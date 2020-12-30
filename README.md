@@ -40,9 +40,43 @@ See also: [Spacecookie's gophermap-pygopherd.txt](https://github.com/sternenseem
     to have includes for stuff like a header and footer without needing to use the include in every
     menu (`*.md.mustache`) you wish to parse
 
-## Mustache lambdas
+### Planned features
 
-You have some Mustache lambdas at your disposal. Use them like this:
+  * Configuration script for changing what the parser changes markdown things
+    to like bold, headings, etc.
+  * More text formatting features (as Mustache lambdas) like creating columns
+  * Better heading ASCII art font support
+
+## The markdown parser
+
+### Header fonts
+
+Markdown headers will be parsed to fancy ASCII art font...
+
+## Mustache
+
+### Partial system
+
+Mustache supports "partials." This is how they work:
+
+```
+{{> somefile }}
+```
+
+I guess? What about search path idk...
+
+#### File-extension-based templating
+
+You can create various types of templates in `mustache/extensions`...
+
+#### Include-style templating
+
+You can create partials to use in templates with  `{{>
+somefile.txt.mustache}}`... They should be in `mustache/includes`.
+
+#### Mustache lambdas
+
+You have some Mustache lambdas at your disposal. Use them like this `justify` function, which wil create a justified block of text (each line of text will have the words spaced to each line is of equal length):
 
 ```
 {{#justify}}
@@ -62,15 +96,4 @@ lacinia commodo.
 
 Other Mustache lambdas:
 
-  * ...
-
-## Header fonts
-
-Markdown headers will be parsed to fancy ASCII art font...
-
-## Planned features
-
-  * Configuration script for changing what the parser changes markdown things
-    to like bold, headings, etc.
-  * More text formatting features (as Mustache lambdas) like creating columns
-  * Better heading ASCII art font support
+  * columnate2: break a block of text into a maximum of two columns
