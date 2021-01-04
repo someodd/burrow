@@ -46,6 +46,7 @@ See also: [Spacecookie's gophermap-pygopherd.txt](https://github.com/sternenseem
     to like bold, headings, etc.
   * More text formatting features (as Mustache lambdas) like creating columns
   * Better heading ASCII art font support
+  * Phlogging tools!
 
 ## The markdown parser
 
