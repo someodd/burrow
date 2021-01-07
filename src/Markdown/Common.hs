@@ -12,12 +12,6 @@ makeHeading' :: Text -> Text
 makeHeading' t = (T.pack $ headingCompose h1 $ T.unpack t)
 
 
--- | Prefix each line passed with the character 'i' for
--- "informational message" (Gopher protocol thing).
-prefixInfo :: Text -> Text
-prefixInfo text = T.unlines $ fmap ("i" <>) $ T.lines text
-
-
 -- | Parse a Markdown paragraph into... well a regular paragraph.
 parseParagraph :: Text -> Text
 parseParagraph ils = "\n" <> ils <> "\n"

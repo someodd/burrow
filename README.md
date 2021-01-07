@@ -27,9 +27,14 @@ repo](https://github.com/hyperrealgopher/docker-spacecookie).
 
 To generate `.gophermaps` from `index.md.mustache` files use the
 `--spacecookie` flag. Although untested, this should also work for
-[pygopherd](https://github.com/jgoerzen/pygopherd).
+[pygopherd](https://github.com/jgoerzen/pygopherd) and
+[Bucktooth](http://gopher.floodgap.com/gopher/gw.lite?=gopher.floodgap.com+70+312f6275636b).
 
-See also: [Spacecookie's gophermap-pygopherd.txt](https://github.com/sternenseemann/spacecookie/blob/master/docs/gophermap-pygopherd.txt).
+See also:
+
+* [spacecookie-gophermap(5)](https://github.com/sternenseemann/spacecookie/blob/master/docs/man/spacecookie-gophermap.5)
+* [Bucktooth's gophermap tutorial](http://gopher.floodgap.com/gopher/gw.lite?=gopher.floodgap.com+70+302f6275636b2f6462726f7773653f666171757365203161)
+* [pygopherd(8)](https://manpages.debian.org/unstable/pygopherd/pygopherd.8.en.html)
 
 ## Notes
 
