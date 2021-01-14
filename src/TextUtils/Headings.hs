@@ -6,6 +6,7 @@ import Data.Char
 import Data.List (transpose, intercalate)
 import Data.Maybe (maybe)
 
+import Data.List.Split (splitOn)
 import qualified Data.Map as Map
 
 
@@ -19,6 +20,24 @@ import qualified Data.Map as Map
 -- You must have the letter 'a' defined, at least. It is used for
 -- determining the width and height of the rest of the characters.
 type AsciiFont = Map.Map Char [String]
+
+
+-- FIXME: do consistency checking OR padd them out! choose one!
+-- | Create an AsciiFont from a ".bmf` file (burrow monospaced font)...
+parseFont :: FilePath -> IO AsciiFont
+parseFont path = do
+  fontFileContents <- readFile path
+  pure $ Map.fromList $ map charLegendsToPair (splitIntoCharLegends fontFileContents)
+ where
+  splitIntoCharLegends = splitOn "\n\n"
+  charLegendsToPair charLegend =
+    case lines charLegend of
+      x:[] -> error "Char legend misformatted."
+      x:xs ->
+        case x of
+          c:[] -> (c, xs)
+          _ -> error "Legend in char legend is not just a single character."
+      _ -> error "Char legend misformatted."
 
 
 -- Need to make it so you can actually load in fonts from files

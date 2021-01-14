@@ -131,7 +131,7 @@ writeOutBasedOn destinationDirectory spaceCookie templateToRenderPath dataForMus
       out <- outParse testContents :: IO (Either ParseError (GopherMenu))
       outCheck out filePath
  where
-  outParse testContents' = parseCommonmarkWith defaultSyntaxSpec (tokenize "source" testContents')
+  outParse testContents' = commonmarkWith defaultSyntaxSpec "test" testContents'
   -- needs to create directories too FIXME/TODO
   outCheck out' filePath = do
     let outPath =
