@@ -31,5 +31,3 @@ parseHeading level ils = T.pack $ headingCompose font $ show ils
     case level of
       1 -> h1
       _ -> h1
-
-
