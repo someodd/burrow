@@ -69,6 +69,7 @@ common shared-properties
     unordered-containers,
     filepath,
     optparse-applicative,
+    mtl,
     commonmark
 
   -- LANGUAGE extensions used by modules in this package.
@@ -105,6 +106,7 @@ library
     Markdown.Common
     Mustache
     Build
+    Types
 
   -- Modules included in this library but not exported.
   -- other-modules:
