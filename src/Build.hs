@@ -11,6 +11,7 @@ import Data.List (isSuffixOf)
 import Data.Foldable (traverse_)
 import System.FilePath (takeDirectory, takeFileName)
 
+import qualified Data.Text as T
 import System.Directory (createDirectoryIfMissing)
 import System.FilePattern.Directory
 import Data.List.Split (splitOn)
@@ -21,12 +22,15 @@ import           Commonmark.Entity (lookupEntity)
 import Text.Mustache
 import qualified Text.Mustache.Types as Mtype
 
+import Control.Monad.Reader
 import qualified Data.Text as Text
 
 import TextUtils
+import TextUtils.Headings
 import Markdown.ToTextFile
 import Markdown.ToGopherMenu
 import Mustache
+import Types
 
 
 -- | This indicates if a file should be parsed as a text file intended
@@ -39,6 +43,8 @@ data ParseType = GopherFileType | GopherMenuType
 -- files according to its ParseType.
 type FileToParse = (FilePath, ParseType)
 
+
+-- | This loads a bunch of files from disk into the environment map for...
 
 -- FIXME: should error otherwise
 -- | Assumes you're providing *.md.mustache or *.txt.mustache.
@@ -125,8 +131,13 @@ writeOutBasedOn destinationDirectory spaceCookie templateToRenderPath dataForMus
   -- Parse markdown
   case parseType of
     GopherFileType -> do
-      out <- outParse testContents :: IO (Either ParseError (GopherFile))
-      outCheck out filePath
+      out <- outParse testContents :: IO (Either ParseError (ParseEnv GopherFile))
+      case out of
+        Left parseError -> error $ show parseError
+        Right penv -> do
+          allTheAsciiFonts <- getAsciiFonts
+          let out' = runReader penv allTheAsciiFonts
+          outCheck' out' filePath
     GopherMenuType -> do
       out <- outParse testContents :: IO (Either ParseError (GopherMenu))
       outCheck out filePath
@@ -143,6 +154,16 @@ writeOutBasedOn destinationDirectory spaceCookie templateToRenderPath dataForMus
     case out' of
       Left parseError -> error $ show parseError
       Right gopher -> writeFile outPath (show gopher)
+
+  outCheck' (GopherFile out') filePath = do
+    let outPath =
+          if spaceCookie && spacecookieGophermapName `isSuffixOf` filePath
+            then let x = (takeDirectory $ destinationDirectory ++ filePath) in x ++ "/.gophermap"
+            else destinationDirectory ++ filePath
+        directory = takeDirectory outPath
+    createDirectoryIfMissing True directory
+    writeFile outPath (T.unpack out')
+
 
 
 -- | Writes out to equivalent...

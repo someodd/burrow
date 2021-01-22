@@ -9,6 +9,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 module Markdown.ToTextFile where
 
+import Control.Monad.Reader
 import qualified Data.Map as Map
 import Text.Mustache
 import Commonmark hiding (addAttribute, escapeURI)
@@ -28,18 +29,20 @@ import           Data.Maybe           (fromMaybe)
 
 import TextUtils.Headings
 import Markdown.Common
+import Types
 
 
 -- | A text file intended to be viewed in gopherspace.
 data GopherFile = GopherFile Text | GopherFileNull
 
 
-instance HasAttributes GopherFile where
+instance HasAttributes (ParseEnv GopherFile) where
   addAttributes attrs x = x
 
 
-instance Show GopherFile where
-  show (GopherFile t) = T.unpack t
+-- | DO NOT USE
+instance Show (ParseEnv GopherFile) where
+  show _ = "I *said*: DO NOT USE!"
 
 
 instance Semigroup (GopherFile) where
@@ -48,37 +51,74 @@ instance Semigroup (GopherFile) where
   GopherFile t1 <> GopherFile t2   = GopherFile (t1 <> t2)
 
 
-instance Monoid (GopherFile) where
-  mempty = GopherFileNull
+instance Semigroup (ParseEnv GopherFile) where
+  x <> y = do
+    x' <- x
+    y' <- y
+    pure $ x' <> y'
+
+
+instance Monoid (ParseEnv GopherFile) where
+  mempty = pure GopherFileNull
   mappend = (<>)
 
 
-instance Rangeable (GopherFile) where
+instance Rangeable (ParseEnv GopherFile) where
   ranged _ x = x
 
 
-instance Rangeable (GopherFile) => IsInline (GopherFile) where
-  lineBreak = GopherFile "\n"
-  softBreak = GopherFile "\n"
-  str t = GopherFile t
-  entity t = GopherFile t
-  escapedChar c = GopherFile (T.pack $ c:[])
+instance Rangeable (ParseEnv GopherFile) => IsInline (ParseEnv GopherFile) where
+  lineBreak = pure $ GopherFile "\n"
+  softBreak = pure $ GopherFile "\n"
+  str t = pure $ GopherFile t
+  entity t = pure $ GopherFile t
+  escapedChar c = pure $ GopherFile (T.pack $ c:[])
   emph ils = ils
   strong ils = ils
   link target title ils = ils
   image target title ils = ils
-  code t = GopherFile t
-  rawInline f t = GopherFile t
+  code t = pure $ GopherFile t
+  rawInline f t = pure $ GopherFile t
 
 
-instance IsInline (GopherFile) => IsBlock (GopherFile) (GopherFile) where
-  paragraph (GopherFile ils) = GopherFile $ parseParagraph ils
-  plain ils = ils
-  thematicBreak = GopherFile "------------------"
-  blockQuote bs = bs
-  codeBlock info t = GopherFile t
-  heading level (GopherFile ils) = GopherFile $ parseHeading level ils
-  rawBlock f t = GopherFile t
-  referenceLinkDefinition _ _ = GopherFile ""
-  list (BulletList _) lSpacing items = GopherFile ""
-  list (OrderedList startnum enumtype _delimtype) lSpacing items = GopherFile ""
+-- type FontMap = Map.Map String AsciiFont
+
+-- | Parse a Markdown heading into a fancy, beautiful ASCII art heading.
+parseHeading' :: Int -> Map.Map String AsciiFont -> Text -> Text
+parseHeading' level fonts ils = T.pack $ headingCompose font $ show ils
+ where
+  -- temporary for prototype
+  theFont =
+    case Map.lookup "h1" fonts of
+      Nothing -> error "oh no"
+      Just f -> f
+
+  font =
+    case level of
+      1 -> theFont
+      _ -> theFont
+
+-- for ils
+gopherFileOrNull penv func = do
+  gopherThing <- penv
+  case gopherThing of
+    GopherFile ils -> func ils
+    GopherFileNull -> pure GopherFileNull
+
+instance IsInline (ParseEnv GopherFile) => IsBlock (ParseEnv GopherFile) (ParseEnv GopherFile) where
+  paragraph penv = do
+    gopherFileOrNull penv (\ils -> pure $ GopherFile $ parseParagraph ils)
+  plain penv = penv
+  thematicBreak = pure $ GopherFile "------------------"
+  blockQuote penv = penv
+  codeBlock info t = pure (GopherFile t)
+  heading level penv = do
+    gopherFileOrNull penv daFunc
+   where
+    daFunc ils = do
+      fonts <- ask
+      pure $ GopherFile $ parseHeading' level fonts ils
+  rawBlock f t = pure $ GopherFile t
+  referenceLinkDefinition _ _ = pure $ GopherFile ""
+  list (BulletList _) lSpacing items = pure $ GopherFile ""
+  list (OrderedList startnum enumtype _delimtype) lSpacing items = pure $ GopherFile ""
