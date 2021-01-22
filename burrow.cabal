@@ -59,7 +59,7 @@ common shared-properties
     text,
     parsec,
     word-wrap,
-    table-layout==0.9.0.2,
+    table-layout         ^>=0.9,
     split,
     bytestring,
     containers,

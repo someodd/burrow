@@ -33,13 +33,6 @@ import TextUtils.Headings
 import Markdown.Common
 
 
--- | Prefix all lines with the 'i' for the noncanonical info message.
---
--- This is a Gopher protocol menu thing.
-prefixLinesInfoChar :: Text -> Text
-prefixLinesInfoChar textLines = T.unlines $ fmap ("i" <>) (T.lines $ error $ T.unpack textLines)
-
-
 -- | Make a Gopher link according to the Gopher spec (RFC 1496 I think).
 parseLinkToGopherMenuLink :: Text -> Text -> [GopherLine] -> Text
 parseLinkToGopherMenuLink target title ils = "\n" <> ((determineLinkType target) target title ils') <> "\n"
@@ -64,7 +57,7 @@ parseLinkToGopherMenuLink target title ils = "\n" <> ((determineLinkType target)
 
 instance Show GopherLine where
   show (GopherNewLine) = ""
-  show (GopherCompleteInfoLine t) = T.unpack ("i" <> t)
+  show (GopherCompleteInfoLine t) = T.unpack . T.filter (/= '\t') $ t
   show (GopherIncompleteInfoLine t) = T.unpack t
   show (GopherLinkLine t) = T.unpack t-- or something lol
 
