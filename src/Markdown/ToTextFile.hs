@@ -83,6 +83,7 @@ instance Rangeable (ParseEnv GopherFile) => IsInline (ParseEnv GopherFile) where
 
 -- type FontMap = Map.Map String AsciiFont
 
+-- should be in common?
 -- | Parse a Markdown heading into a fancy, beautiful ASCII art heading.
 parseHeading' :: Int -> Map.Map String AsciiFont -> Text -> Text
 parseHeading' level fonts ils = T.pack $ headingCompose font $ show ils
