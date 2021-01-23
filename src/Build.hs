@@ -136,11 +136,17 @@ writeOutBasedOn destinationDirectory spaceCookie templateToRenderPath dataForMus
         Left parseError -> error $ show parseError
         Right penv -> do
           allTheAsciiFonts <- getAsciiFonts
-          let out' = runReader penv allTheAsciiFonts
+          let (GopherFile out') = runReader penv allTheAsciiFonts
           outCheck' out' filePath
     GopherMenuType -> do
-      out <- outParse testContents :: IO (Either ParseError (GopherMenu))
-      outCheck out filePath
+      out <- outParse testContents :: IO (Either ParseError (ParseEnv GopherMenu))
+      case out of
+        Left parseError -> error $ show parseError
+        Right penv -> do
+          allTheAsciiFonts <- getAsciiFonts
+          let out' = runReader penv allTheAsciiFonts
+              out'' = gopherMenuToText out'
+          outCheck' out'' filePath
  where
   outParse testContents' = commonmarkWith defaultSyntaxSpec "test" testContents'
   -- needs to create directories too FIXME/TODO
@@ -155,7 +161,7 @@ writeOutBasedOn destinationDirectory spaceCookie templateToRenderPath dataForMus
       Left parseError -> error $ show parseError
       Right gopher -> writeFile outPath (show gopher)
 
-  outCheck' (GopherFile out') filePath = do
+  outCheck' out' filePath = do
     let outPath =
           if spaceCookie && spacecookieGophermapName `isSuffixOf` filePath
             then let x = (takeDirectory $ destinationDirectory ++ filePath) in x ++ "/.gophermap"

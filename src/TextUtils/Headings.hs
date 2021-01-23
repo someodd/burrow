@@ -123,6 +123,6 @@ headingCompose font string = "\n" ++ composeJoin
 
   convert = map (fontLetter font) string
 
-  addSpace = map (fmap (++ " "))
-
-  composeJoin = unlines $ map (intercalate "") $ transpose (addSpace convert)
+  --addSpace = map (fmap (++ " "))
+  --composeJoin = unlines $ map (intercalate "") $ transpose (addSpace convert)
+  composeJoin = unlines $ map (intercalate "") $ transpose convert
