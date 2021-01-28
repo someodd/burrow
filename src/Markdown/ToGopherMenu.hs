@@ -228,9 +228,9 @@ instance IsInline (ParseEnv GopherMenu) => IsBlock (ParseEnv GopherMenu) (ParseE
       GopherNull -> pure GopherNull
   --heading level (GopherBlock ils) = GopherBlock $ [GopherCompleteInfoLine "wowza"]
    where
-    headerText ils = 
+    headerText ils =
       let toLines (GopherIncompleteInfoLine t) = t
-      in T.unlines $ map toLines ils
+      in T.pack $ intercalate "" $ map T.unpack $ map toLines ils
     header fonts ils = T.lines $ parseHeading' level fonts (headerText ils)
     --(map (\x -> GopherCompleteInfoLine (x <> "\n")) ())
     formattedHeader fonts ils = intersperse GopherNewLine $ map GopherIncompleteInfoLine (header fonts ils)
