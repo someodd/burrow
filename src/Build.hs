@@ -1,9 +1,17 @@
+-- FIXME: maybe use the filepath library to ensure slashes in the right place, for consistency, avoiding terrible bugs
+-- FIXME: there needs to be a consistent name for the Burrow partial/template system.
 -- FIXME: make note that all parseable files must be some kind of *.mustache?
--- | The main file in the library. This is where all the code is used to
--- actually parse file(s) to a gopherhole!
+-- TODO: note that the partial template used must match the type/extension of the
+-- actual file being parsed which uses the parser.
 {-# LANGUAGE OverloadedStrings          #-}
+-- | Parse all the files from a directory and write them out to the specified
+-- directory where built files go (the files for the gopherhole!).
+--
+-- Understanding this module may require a general understanding of the Mustache package and language.
+-- Knowing the Commonmark package helps, too.
 module Build 
   ( doTheParsing
+  -- ^ Build the gopherhole!
   ) 
 where
 
@@ -36,7 +44,7 @@ import Mustache
 import Types
 
 
--- | This is the special name for generating spacecookie indexes if enabled (gophermaps)
+-- | This is the special name for generating spacecookie indexes if enabled (gophermaps).
 spacecookieGophermapName = "index.md.mustache"
 
 
@@ -44,7 +52,7 @@ spacecookieGophermapName = "index.md.mustache"
 type FileName = FilePath
 
 
--- | The parser to use to transform Markdown files to various outputs
+-- | The Markdown parser to use to transform Markdown files to various outputs
 -- (like menus/gophermaps) suitable for gopherspace.
 data ParseType = GopherFileType
                -- ^ Parse to plaintext ASCII-art-style file.
@@ -52,15 +60,19 @@ data ParseType = GopherFileType
                -- ^ Parse to a gophermap/Gopher menu.
                -- NOTE: for below: maybe better named "CopyOnly!"
                | Skip
-               -- ^ Will not be parsed! Will simply be copied. Maybe better named 
+               -- ^ Will not be parsed! Will simply be copied.
 
 
--- TODO: create a map of file extension to parser type?
+-- | A file extension which maps to one of Burrow's Markdown parsers.
 type ParseSuffix = String
 
 
--- | The supported file extensions/file types which are mapped
--- to a specific parser.
+-- FIXME: These extensions don't make sense. It's all Markdown, so it
+-- should parse .menu.md.mustache and .txt.md.mustache or something. Where the
+-- first extension specifies the output format, the second is the format it's in
+-- (Markdown),
+-- the last is that it will be assembled (substitutions) with Mustache.
+-- | File extensions and which Markdown parser will be used for them.
 suffixParseMap :: Map.Map ParseSuffix ParseType
 suffixParseMap = Map.fromList
   [ ("txt.mustache", GopherFileType)
@@ -96,7 +108,7 @@ getParseType filePath =
 type FileToParse = (FilePath, ParseType)
 
 
--- | Creates a list of files to parse, along with which parser to use.
+-- | Creates a list of files to parse in a given directory, along with which parser to use.
 filesToParse :: FilePath -> IO [FileToParse]
 filesToParse sourceDirectory = do
   filesMatching <- getDirectoryFiles sourceDirectory ["**/*.txt.mustache", "**/*.md.mustache"]
@@ -104,12 +116,25 @@ filesToParse sourceDirectory = do
 
 
 -- | Global variables which can be access by a Mustache file being parsed.
-dataForMustache = [("title", Mtype.String "My Gopherhole"), ("justify2", overText justify2), ("justify", overText justify'), ("columnate2", overText columnate2)]
-
-
--- | Match the 'somepartial" of foo/bar/somefilename.somepartial.partial.*.mustache
 --
--- Will return Nothing if doesn't use a partial or isn't a valid parseable file.
+-- These are the "substitutions" for Mustache. These are functions (lambdas),
+-- and regular string values.
+--
+-- These substitutions are later modified to include a Mustache partial for
+-- the Burrow template/partial system.
+dataForMustache :: [(Text.Text, Mtype.Value)]
+dataForMustache =
+  [ ("title", Mtype.String "My Gopherhole")
+  , ("justify2", overText justify2)
+  , ("justify", overText justify')
+  , ("columnate2", overText columnate2)
+  ]
+
+
+-- | Match the "somepartial" of */*/*.somepartial.partial.*.mustache
+--
+-- Will return Nothing if doesn't use a partial or if the extension isn't
+-- mapped to a Markdown parser.
 --
 -- >>> matchPartial "foo/bar/afile.phlogpost.partial.txt.mustache"
 -- Just ("phlogpost", ".txt.mustache")
@@ -133,45 +158,52 @@ matchPartial filePath =
 -- and file type? idk...
 -- NOTE: data for mustache is merely a series of substitutions/globals for a mustache template. please
 -- see the dataForMustache variable.
+-- | Parse a file, mostly creating a ParseFileRecipe and sending it off to the function (`writeOutBasedOn`)
+-- that actually uses the recipe to parse the supplied file.
 parseFile :: FilePath -> FilePath -> Bool -> FileToParse -> IO ()
 parseFile sourceDirectory destinationDirectory spaceCookie (filePath, parseType) = do
-  case matchPartial filePath of
-    Just (templateToUse, extension) -> parseUsingPartial templateToUse extension
-    Nothing -> parseWithoutPartial
+  recipe <- case matchPartial filePath of
+              Just (templateToUse, extension) -> recipeWithPartial templateToUse extension
+              Nothing -> pure recipeWithoutPartial
+  writeOutBasedOn recipe
  where
+  filePathIncludingSourceDirectory :: String
   filePathIncludingSourceDirectory = sourceDirectory ++ filePath
-  parseUsingPartial templateToUse extension = do
+
+  -- Create the recipe for a file that uses partials.
+  recipeWithPartial :: String -> String -> IO ParseFileRecipe
+  recipeWithPartial templateToUse extension = do
     let partial'sTemplatePath = "templates/" ++ templateToUse ++ extension
     partial <- readFile filePathIncludingSourceDirectory
     -- FIXME, TODO: it feels like this is being done twice!
     let newDataForMustache = ("partial", Mtype.String (pack partial)):dataForMustache
-    let recipe = ParseFileRecipe
-                   { pfrSourceDirectory = sourceDirectory
-                   , pfrDestinationDirectory = destinationDirectory
-                   , pfrSpacecookie = spaceCookie
-                   , pfrTemplateToRender = partial'sTemplatePath
-                   , pfrParseType = parseType
-                   , pfrOutPath = filePath
-                   , pfrIncludePartial = Just filePathIncludingSourceDirectory
-                   , pfrSubstitutions = newDataForMustache
-                   }
-    writeOutBasedOn recipe
+    pure $ ParseFileRecipe
+             { pfrSourceDirectory = sourceDirectory
+             , pfrDestinationDirectory = destinationDirectory
+             , pfrSpacecookie = spaceCookie
+             , pfrTemplateToRender = partial'sTemplatePath
+             , pfrParseType = parseType
+             , pfrOutPath = filePath
+             , pfrIncludePartial = Just filePathIncludingSourceDirectory
+             , pfrSubstitutions = newDataForMustache
+             }
 
-  parseWithoutPartial = 
-    ---do the normal thing
-    let recipe = ParseFileRecipe
-                   { pfrSourceDirectory = sourceDirectory
-                   , pfrDestinationDirectory = destinationDirectory
-                   , pfrSpacecookie = spaceCookie
-                   , pfrTemplateToRender = filePathIncludingSourceDirectory
-                   , pfrParseType = parseType
-                   , pfrOutPath = filePath
-                   , pfrIncludePartial = Nothing
-                   , pfrSubstitutions = dataForMustache
-                   }
-    in writeOutBasedOn recipe
+  -- Create the recipe for a file that does not use partials.
+  recipeWithoutPartial :: ParseFileRecipe
+  recipeWithoutPartial = 
+    ParseFileRecipe
+      { pfrSourceDirectory = sourceDirectory
+      , pfrDestinationDirectory = destinationDirectory
+      , pfrSpacecookie = spaceCookie
+      , pfrTemplateToRender = filePathIncludingSourceDirectory
+      , pfrParseType = parseType
+      , pfrOutPath = filePath
+      , pfrIncludePartial = Nothing
+      , pfrSubstitutions = dataForMustache
+      }
 
 
+-- FIXME: what is this even?!
 getCompiledTemplate searchSpace templateToRenderPath = do
   compiled <- automaticCompile searchSpace templateToRenderPath
   case compiled of
@@ -179,7 +211,8 @@ getCompiledTemplate searchSpace templateToRenderPath = do
     Right template -> pure template
 
 
--- | ...
+-- | All the settings for a function (`writeOutBasedOn`) to parse a file
+-- using Commonmark and Mustache.
 data ParseFileRecipe = ParseFileRecipe
   { pfrSourceDirectory :: FilePath
   -- ^ The directory which the main file is from.
@@ -205,10 +238,9 @@ data ParseFileRecipe = ParseFileRecipe
 
 
 -- TODO: prepareTemplate = do
-
--- FIXME: what is this mess?!
---writeOutBasedOn sourceDirectory destinationDirectory spaceCookie templateToRenderPath dataForMustache parseType outPath addPartial = do
-writeOutBasedOn recipe = do
+-- | Prepares the file which needs to be parsed as a Mustache template.
+parseMustache :: ParseFileRecipe -> IO Text.Text
+parseMustache recipe = do
   secondaryTemplate <- case pfrIncludePartial recipe of
                          Just contentToParsePath -> getCompiledTemplate searchSpace contentToParsePath
                          Nothing -> getCompiledTemplate searchSpace (pfrTemplateToRender recipe)
@@ -229,18 +261,33 @@ writeOutBasedOn recipe = do
                         Right template -> pure template
                     Nothing -> pure secondaryTemplate
 
-
-  -- shouldn't the template be decided based off its type i guess? or shoudl we leave it
-  -- up to user
-  -- tell if partial by *.something.partial.something.mustache
-  -- this will indicate if should use the "something" partial
-  let filePath = (pfrOutPath recipe)
-
+  -- could put this in the prepareTemplate?
       -- should put this stuff in Mustache
   -- FIXME: what's happening here?!
   let k = Map.fromList (pfrSubstitutions recipe) :: Map.Map Text.Text Mtype.Value
       -- where is this substitute function coming from?! is it commonmark to preform the partial substitution?
       testContents = substitute mainTemplate k
+
+  pure testContents
+
+
+-- FIXME: this needs to be broken down into smaller parts.
+-- FIXME: what is this mess?!
+-- | Parse/write out a file according to the supplied ParseFileRecipe.
+writeOutBasedOn :: ParseFileRecipe -> IO ()
+writeOutBasedOn recipe = do
+  testContents <- parseMustache recipe
+  parseMarkdown recipe testContents
+
+
+-- FIXME: this does too much, including writing out. should just give back bytes or something idk
+parseMarkdown :: ParseFileRecipe -> Text.Text -> IO ()
+parseMarkdown recipe testContents = do
+  -- shouldn't the template be decided based off its type i guess? or shoudl we leave it
+  -- up to user
+  -- tell if partial by *.something.partial.something.mustache
+  -- this will indicate if should use the "something" partial
+  let filePath = (pfrOutPath recipe)
 
   -- FIXME: shouldn't there be a better way of doing this?
   -- Parse markdown
@@ -271,8 +318,10 @@ writeOutBasedOn recipe = do
       createDirectoryIfMissing True destinationDirectory
       copyFile source destination
  where
+  -- FIXME: bad name, no docs
   outParse testContents' = commonmarkWith defaultSyntaxSpec "test" testContents'
 
+  -- FIXME: bad name, no docs
   outCheck' out' filePath = do
     let outPath =
           if (pfrSpacecookie recipe) && spacecookieGophermapName `isSuffixOf` filePath
@@ -283,10 +332,8 @@ writeOutBasedOn recipe = do
     writeFile outPath (T.unpack out')
 
 
--- | Writes out to equivalent...
---writeFileOut
-
--- FIXME: use filepaths to ensure trailing slash
+-- | The exposed function to parse and copy a directory's files out to a new directory which
+-- can be served via the Gopher protocol.
 doTheParsing :: FilePath -> FilePath -> Bool -> IO ()
 doTheParsing sourceDir destDir spaceCookie =
   filesToParse sourceDir >>= traverse_ (parseFile sourceDir destDir spaceCookie)
