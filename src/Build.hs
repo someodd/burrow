@@ -282,14 +282,7 @@ writeOutBasedOn recipe = do
 
 -- FIXME: this does too much, including writing out. should just give back bytes or something idk
 parseMarkdown :: ParseFileRecipe -> Text.Text -> IO ()
-parseMarkdown recipe testContents = do
-  -- shouldn't the template be decided based off its type i guess? or shoudl we leave it
-  -- up to user
-  -- tell if partial by *.something.partial.something.mustache
-  -- this will indicate if should use the "something" partial
-
-  -- FIXME: shouldn't there be a better way of doing this?
-  -- Parse markdown
+parseMarkdown recipe contents =
   case pfrParseType recipe of
     -- NOTE: The way this type is setup seems redundant/adds extra maintenence just use a sumtype like ParseType = GopherFile | GopherMenu? FIXME/NOTE/TODO
     -- Parse the markdown text out as a text file to be served in gopherspace.
@@ -299,6 +292,7 @@ parseMarkdown recipe testContents = do
     -- Do not parse this file. Simply copy the file to the new destination!
     Skip -> noParseOut
  where
+  -- This is where the file will be writen out to.
   filePath :: FilePath
   filePath = pfrOutPath recipe
 
@@ -307,8 +301,8 @@ parseMarkdown recipe testContents = do
 
   -- Write text to the target/built directory, creating directories in the process if needed.
   -- Will also write out to the file name .gophermap if the input file name matched spacecookieGophermapName.
-  writeOut :: Text.Text -> FilePath -> IO ()
-  writeOut text filePath = do
+  writeOut :: Text.Text -> IO ()
+  writeOut text = do
     let outPath =
           if (pfrSpacecookie recipe) && spacecookieGophermapName `isSuffixOf` filePath
             then let x = (takeDirectory $ pfrDestinationDirectory recipe ++ filePath) in x ++ "/.gophermap"
@@ -317,26 +311,31 @@ parseMarkdown recipe testContents = do
     createDirectoryIfMissing True directory
     writeFile outPath $ T.unpack text
 
+  -- Parse the contents as a text file for gopherspace and write out to the target directory.
+  parseOutGopherFile :: IO ()
   parseOutGopherFile = do
-    out <- parseCommonmark testContents :: IO (Either ParseError (ParseEnv GopherFile))
+    out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherFile))
     case out of
       Left parseError -> error $ show parseError
       Right penv -> do
         allTheAsciiFonts <- getAsciiFonts
         let (GopherFile out') = runReader penv allTheAsciiFonts
-        writeOut out' filePath
+        writeOut out'
 
+  -- Parse the contents as a Gopher menu/gophermap for gopherspace and write out to the target directory.
+  parseOutGopherMenu :: IO ()
   parseOutGopherMenu = do
-    out <- parseCommonmark testContents :: IO (Either ParseError (ParseEnv GopherMenu))
+    out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherMenu))
     case out of
       Left parseError -> error $ show parseError
       Right penv -> do
         allTheAsciiFonts <- getAsciiFonts
         let out' = runReader penv allTheAsciiFonts
             out'' = gopherMenuToText out'
-        writeOut out'' filePath
+        writeOut out''
 
-  -- Don't parse; just copy the file.
+  -- Don't parse; just copy the file to the target directory.
+  noParseOut :: IO ()
   noParseOut = do
     let destination = pfrDestinationDirectory recipe ++ filePath
         destinationDirectory = takeDirectory destination
