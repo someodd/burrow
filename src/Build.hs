@@ -287,49 +287,62 @@ parseMarkdown recipe testContents = do
   -- up to user
   -- tell if partial by *.something.partial.something.mustache
   -- this will indicate if should use the "something" partial
-  let filePath = (pfrOutPath recipe)
 
   -- FIXME: shouldn't there be a better way of doing this?
   -- Parse markdown
   case pfrParseType recipe of
-    -- The way this type is setup seems redundant/adds extra maintenence just use a sumtype like ParseType = GopherFile | GopherMenu? FIXME/NOTE/TODO
-    GopherFileType -> do
-      out <- outParse testContents :: IO (Either ParseError (ParseEnv GopherFile))
-      case out of
-        Left parseError -> error $ show parseError
-        Right penv -> do
-          allTheAsciiFonts <- getAsciiFonts
-          let (GopherFile out') = runReader penv allTheAsciiFonts
-          outCheck' out' filePath
-    GopherMenuType -> do
-      out <- outParse testContents :: IO (Either ParseError (ParseEnv GopherMenu))
-      case out of
-        Left parseError -> error $ show parseError
-        Right penv -> do
-          allTheAsciiFonts <- getAsciiFonts
-          let out' = runReader penv allTheAsciiFonts
-              out'' = gopherMenuToText out'
-          outCheck' out'' filePath
-    -- Simply copy the file to the new destination!
-    Skip -> do
-      let destination = pfrDestinationDirectory recipe ++ filePath
-          destinationDirectory = takeDirectory destination
-          source = pfrSourceDirectory recipe ++ filePath
-      createDirectoryIfMissing True destinationDirectory
-      copyFile source destination
+    -- NOTE: The way this type is setup seems redundant/adds extra maintenence just use a sumtype like ParseType = GopherFile | GopherMenu? FIXME/NOTE/TODO
+    -- Parse the markdown text out as a text file to be served in gopherspace.
+    GopherFileType -> parseOutGopherFile
+    -- Parse the markdown text out as a gophermap/menu.
+    GopherMenuType -> parseOutGopherMenu
+    -- Do not parse this file. Simply copy the file to the new destination!
+    Skip -> noParseOut
  where
-  -- FIXME: bad name, no docs
-  outParse testContents' = commonmarkWith defaultSyntaxSpec "test" testContents'
+  filePath :: FilePath
+  filePath = pfrOutPath recipe
 
-  -- FIXME: bad name, no docs
-  outCheck' out' filePath = do
+  -- When used needs to specify the type. 
+  parseCommonmark testContents' = commonmarkWith defaultSyntaxSpec "test" testContents'
+
+  -- Write text to the target/built directory, creating directories in the process if needed.
+  -- Will also write out to the file name .gophermap if the input file name matched spacecookieGophermapName.
+  writeOut :: Text.Text -> FilePath -> IO ()
+  writeOut text filePath = do
     let outPath =
           if (pfrSpacecookie recipe) && spacecookieGophermapName `isSuffixOf` filePath
             then let x = (takeDirectory $ pfrDestinationDirectory recipe ++ filePath) in x ++ "/.gophermap"
             else pfrDestinationDirectory recipe ++ filePath
         directory = takeDirectory $ pfrDestinationDirectory recipe ++ (pfrOutPath recipe)
     createDirectoryIfMissing True directory
-    writeFile outPath (T.unpack out')
+    writeFile outPath $ T.unpack text
+
+  parseOutGopherFile = do
+    out <- parseCommonmark testContents :: IO (Either ParseError (ParseEnv GopherFile))
+    case out of
+      Left parseError -> error $ show parseError
+      Right penv -> do
+        allTheAsciiFonts <- getAsciiFonts
+        let (GopherFile out') = runReader penv allTheAsciiFonts
+        writeOut out' filePath
+
+  parseOutGopherMenu = do
+    out <- parseCommonmark testContents :: IO (Either ParseError (ParseEnv GopherMenu))
+    case out of
+      Left parseError -> error $ show parseError
+      Right penv -> do
+        allTheAsciiFonts <- getAsciiFonts
+        let out' = runReader penv allTheAsciiFonts
+            out'' = gopherMenuToText out'
+        writeOut out'' filePath
+
+  -- Don't parse; just copy the file.
+  noParseOut = do
+    let destination = pfrDestinationDirectory recipe ++ filePath
+        destinationDirectory = takeDirectory destination
+        source = pfrSourceDirectory recipe ++ filePath
+    createDirectoryIfMissing True destinationDirectory
+    copyFile source destination
 
 
 -- | The exposed function to parse and copy a directory's files out to a new directory which
