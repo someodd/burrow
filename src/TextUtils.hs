@@ -1,4 +1,4 @@
--- | Special text formatting functions.
+-- | Special text formatting functions to make pretty files and menus in gopherspace.
 --
 -- Mostly gets used as Mustache lambdas.
 {-# LANGUAGE OverloadedStrings          #-}
@@ -13,9 +13,13 @@ import qualified Text.Layout.Table.Justify as Justify
 import Text.Wrap
 
 
+-- | The maximum width of the gopherhole page. All the functions use this
+-- to do any width calculations.
+maxWidth :: Int
 maxWidth = 79
 
--- should hyphenate break long words
+-- TODO: should hyphenate break long words
+-- | Mustache-lambda-friendly function for text justification.
 justify2 :: Text.Text -> Text.Text
 justify2 text = Text.pack . unlines $ Justify.justifyText paragraphWidth (unlines wrappedLines)
  where
@@ -24,10 +28,12 @@ justify2 text = Text.pack . unlines $ Justify.justifyText paragraphWidth (unline
   wrappedLines = map Text.unpack $ wrapTextToLines wrapSettings paragraphWidth text
 
 
+-- | The Mustache-lambda-friendly version of Burrow's custom text justification function.
 justify' :: Text.Text -> Text.Text
 justify' text = Text.pack . unlines $ justify (Text.unpack text)
 
 
+-- | Burrow's custom text justification function. Implemented for fun.
 justify :: String -> [String]
 justify string = map (flip addSpaceToNthWord 0) wrappedLines
  where
@@ -62,46 +68,60 @@ justify string = map (flip addSpaceToNthWord 0) wrappedLines
         | n /= ' ' = (x ++ [n]) : xs
 
 
--- This doesn't preserve the \n
+-- | Mustache-lambda-friendly version of the columnate function, meaning it has preconfigured
+-- column width, max width, and lines per column.
+columnate2 :: Text.Text -> Text.Text
 columnate2 text = "\n\n" <> columnate 38 maxWidth 20 text <> "\n\n"
 
-{-
-split into lines after get single column
-group into text blocks of n lines/size
-transpose? so the first line in one block is aside the first line of the next column and so forth?
-join/intercalate
--}
+
+-- | This is used to separate columns vertically. The column gutter.
+columnSeparator :: Text.Text
+columnSeparator = " │ "
+
+
+-- FIXME: needs to go more in depth talking about which each little function does in terms of twisting the text and columns around.
 -- | Create columnated text out of a text block by defining the column width
--- and the total width, as well as the maximum number of lines before splitting
--- off into a new page.
---columnate :: Int -> Int -> Int -> Text.Text -> Text.Text
+-- and the total width (the "page" width), as well as the maximum number of lines
+-- before splitting off onto a new "page" (set of columns).
+columnate :: Int -> Int -> Int -> Text.Text -> Text.Text
 columnate columnWidth totalMaxWidth maxLinesPerColumn textBlock = finalResult
  where
-  -- The starting point: create a single justified column
-  -- NOTE: not only must we wrap, but we have a special job where we must also pad
+  -- 1: The starting point: create a single justified column. This is accomplished by
+  -- doing word wrap and then justifying the text (as well as performing some padding,
+  -- to ensure each line of the column is the exact same length, so when we put the
+  -- columns side-by-side for each row of columns [a "page"] it looks proper).
   asSingleColumn :: Text.Text
   asSingleColumn =
     let wrapSettings = WrapSettings { preserveIndentation = False, breakLongWords = True } -- It's not breaking long words... should start using knuth's algo
         wrapped = wrapTextToLines wrapSettings columnWidth textBlock
     in Text.unlines $ map (Text.justifyLeft columnWidth ' ') $ map Text.pack $ Justify.justifyText columnWidth (Text.unpack . Text.unlines $ wrapped)
 
-  -- Group the single justified column into text chunks of maxLinesPerColumn
+  -- 2: Group the single justified column into text chunks of maxLinesPerColumn
   maxLinesGroups :: [[Text.Text]]
   maxLinesGroups =
     let singleColumnLines = Text.lines asSingleColumn
     in chunksOf maxLinesPerColumn singleColumnLines
 
-  -- now group the maxLinesGroup by the max # of columns
-  howManyColumnsFit = totalMaxWidth `quot` (columnWidth + 1) -- the +1 is for the column spacing
-  groupedByPage = chunksOf howManyColumnsFit maxLinesGroups
+  -- 3: Take the single justified column, which has been broken up into [Text.Text] groups of a max of
+  -- maxLinesPerColumn number of elemnts and further group those into "pages."
+  --
+  -- A "page" is just a row of columns. The number of columns in a row is determined by the totalMaxWidth
+  -- and the columnWidth (in order to tell how many columns fit given that criteria).
+  groupedByPage :: [[[Text.Text]]]
+  groupedByPage =
+    let howManyColumnsFit = totalMaxWidth `quot` (columnWidth + 1) -- the +1 is for the column spacing
+    in chunksOf howManyColumnsFit maxLinesGroups
 
-  -- now balh
-  parsePage page = Text.unlines $ (map (Text.intercalate (Text.pack " | "))) $ transpose $ page
-
-  nicer = map parsePage groupedByPage
-
-  -- split into groups of how many columns fit to create "pages" or whatever
-
-  -- now...
-  --finalResult = putStr $ Text.unpack $ Text.unlines $ (map (Text.intercalate (Text.pack " @ "))) $ transpose $ maxLinesGroups
-  finalResult = Text.unlines $ nicer
+  -- 4: Join the columns together to produce a Text!
+  --
+  -- This will "transpose" each column row, in order to make it appear as if each column is displayed
+  -- side-by-side in a given row.
+  --
+  -- Remember, we're going from a list of "pages," where pages are
+  -- a row of columns (represented as a list of Text).
+  --
+  -- Columns are separated here with the columnSeparator.
+  finalResult :: Text.Text
+  finalResult =
+    let parsePage page = Text.unlines $ (map (Text.intercalate columnSeparator)) $ transpose $ page
+    in Text.unlines $ map parsePage groupedByPage
