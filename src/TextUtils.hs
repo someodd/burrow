@@ -1,8 +1,14 @@
+-- TODO: maybe columnate stuff should get its own TextUtils.Columnate function!
 -- | Special text formatting functions to make pretty files and menus in gopherspace.
 --
 -- Mostly gets used as Mustache lambdas.
 {-# LANGUAGE OverloadedStrings          #-}
-module TextUtils where
+module TextUtils
+  ( justify2
+  , justify'
+  , columnate2
+  )
+where
 
 import Data.List
 import Data.List.Split (chunksOf)
