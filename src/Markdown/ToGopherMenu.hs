@@ -1,3 +1,9 @@
+-- NOTE: now that 'i' is no longer required on every line to resolve a certain
+-- old bug in spacecookie, is this massively over-complicated and could be
+-- reduced to something like ToTextFile? What are the advantages of this?
+-- I honestly don't think there's any good reason for it to be this complex
+-- anymore and I could use something like ToTextFile just with a special
+-- difference for links.
 -- | Markdown to a Gopher protocol menu.
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE BangPatterns               #-}
@@ -31,7 +37,6 @@ import           Data.Char            (ord, isAlphaNum, isAscii, isSpace)
 import           Data.Maybe           (fromMaybe)
 
 import TextUtils.Headings
-import Markdown.Common
 import Types-- FIXME: should go in markdown common?
 
 

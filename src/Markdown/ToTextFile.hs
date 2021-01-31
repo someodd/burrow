@@ -28,8 +28,12 @@ import           Data.Char            (ord, isAlphaNum, isAscii, isSpace)
 import           Data.Maybe           (fromMaybe)
 
 import TextUtils.Headings
-import Markdown.Common
 import Types
+
+
+-- | Parse a Markdown paragraph into... well a regular paragraph.
+parseParagraph :: Text -> Text
+parseParagraph ils = "\n" <> ils <> "\n"
 
 
 -- | A text file intended to be viewed in gopherspace.

@@ -103,7 +103,6 @@ library
     TextUtils.Headings
     Markdown.ToGopherMenu
     Markdown.ToTextFile
-    Markdown.Common
     Mustache
     Build
     Types
