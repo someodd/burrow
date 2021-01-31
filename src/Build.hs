@@ -39,7 +39,8 @@ import qualified Data.Text as Text
 import TextUtils
 import TextUtils.Headings
 import Markdown.ToTextFile
-import Markdown.ToGopherMenu
+--import Markdown.ToGopherMenu
+import Markdown.ToGopherMenu2
 import Mustache
 import Types
 
@@ -52,6 +53,7 @@ spacecookieGophermapName = "index.md.mustache"
 type FileName = FilePath
 
 
+-- TODO: wouldn't this be better as a sum type?
 -- | The Markdown parser to use to transform Markdown files to various outputs
 -- (like menus/gophermaps) suitable for gopherspace.
 data ParseType = GopherFileType
@@ -330,9 +332,17 @@ parseMarkdown recipe contents =
       Left parseError -> error $ show parseError
       Right penv -> do
         allTheAsciiFonts <- getAsciiFonts
+        let (GopherMenu out') = runReader penv allTheAsciiFonts
+        writeOut out'
+    {-
+    case out of
+      Left parseError -> error $ show parseError
+      Right penv -> do
+        allTheAsciiFonts <- getAsciiFonts
         let out' = runReader penv allTheAsciiFonts
             out'' = gopherMenuToText out'
         writeOut out''
+    -}
 
   -- Don't parse; just copy the file to the target directory.
   noParseOut :: IO ()
