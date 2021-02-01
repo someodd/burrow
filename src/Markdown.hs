@@ -9,7 +9,7 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE UndecidableInstances       #-}
 {-# LANGUAGE OverloadedStrings          #-}
-module Markdown.Common where
+module Markdown where
 
 import Control.Monad.Reader
 import qualified Data.Map as Map

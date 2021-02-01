@@ -40,7 +40,6 @@ import TextUtils
 import TextUtils.Headings
 import Markdown
 import Mustache
-import Types
 
 
 -- | This is the special name for generating spacecookie indexes if enabled (gophermaps).
