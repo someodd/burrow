@@ -1,4 +1,6 @@
--- | Markdown to a text file intended for gopherspace.
+-- | Markdown to a file intended for gopherspace.
+--
+-- Has a lot of flexibility due to Environment/ParseEnv.
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -7,7 +9,7 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE UndecidableInstances       #-}
 {-# LANGUAGE OverloadedStrings          #-}
-module Markdown.ToTextFile where
+module Markdown.Common where
 
 import Control.Monad.Reader
 import qualified Data.Map as Map
@@ -28,12 +30,49 @@ import           Data.Char            (ord, isAlphaNum, isAscii, isSpace)
 import           Data.Maybe           (fromMaybe)
 
 import TextUtils.Headings
-import Types
 
+
+-- | Override certain inline instance methods for the parser.
+data InlineOverrides = InlineOverrides { overrideLink :: Maybe (Text -> Text -> ParseEnv GopherFile -> ParseEnv GopherFile) }
+blankInlineOverrides = InlineOverrides { overrideLink = Nothing }
+
+
+-- | Stuff to make available to the parser.
+data Environment =
+  Environment
+    { envFonts :: Map.Map String AsciiFont
+    , envInlineOverrides :: InlineOverrides
+    }
+
+  
+-- | Make the ascii art font files available to a commonmark parser.
+type ParseEnv a = Reader Environment a
 
 -- | Parse a Markdown paragraph into... well a regular paragraph.
 parseParagraph :: Text -> Text
 parseParagraph ils = "\n" <> ils <> "\n"
+
+
+-- | Make a Gopher link according to the Gopher spec (RFC 1496 I think). This is for
+-- gopher menus, to be supplied as overrideLink.
+parseLinkToGopherMenuLink :: Text -> Text -> Text -> Text
+parseLinkToGopherMenuLink target title ils = "\n" <> ((determineLinkType target) target title ils) <> "\n"
+ where
+  determineLinkType target
+    | "https" `T.isPrefixOf` target = gopherHttpLink
+    | ".txt" `T.isSuffixOf` target = gopherFileLink
+    | otherwise = gopherMenuLink
+
+  gopherHttpLink target title label = "h" <> label <> "\t" <> "URL:" <> target
+  gopherFileLink target title label = "1" <> label <> "\t" <> target
+  gopherMenuLink target title label = "0" <> label <> "\t" <> target
+link' target title penv = do
+  gopher <- penv
+  case gopher of
+    (GopherFile ils) -> 
+      let linkText = parseLinkToGopherMenuLink target title ils
+      in pure $ GopherFile ("\n" <> linkText <> "\n")
+    GopherFileNull -> pure GopherFileNull
 
 
 -- | A text file intended to be viewed in gopherspace.
@@ -79,7 +118,11 @@ instance Rangeable (ParseEnv GopherFile) => IsInline (ParseEnv GopherFile) where
   escapedChar c = pure $ GopherFile (T.pack $ c:[])
   emph ils = ils
   strong ils = ils
-  link target title ils = ils
+  link target title ils = do
+    env <- ask
+    case overrideLink $ envInlineOverrides env of
+      Just func -> func target title ils
+      Nothing -> ils
   image target title ils = ils
   code t = pure $ GopherFile t
   rawInline f t = pure $ GopherFile t
@@ -121,7 +164,8 @@ instance IsInline (ParseEnv GopherFile) => IsBlock (ParseEnv GopherFile) (ParseE
     gopherFileOrNull penv daFunc
    where
     daFunc ils = do
-      fonts <- ask
+      env <- ask
+      let fonts = envFonts env
       pure $ GopherFile $ parseHeading' level fonts ils
   rawBlock f t = pure $ GopherFile t
   referenceLinkDefinition _ _ = pure $ GopherFile ""
