@@ -38,8 +38,7 @@ import qualified Data.Text as Text
 
 import TextUtils
 import TextUtils.Headings
-import Markdown.ToTextFile
-import Markdown.ToGopherMenu
+import Markdown
 import Mustache
 import Types
 
@@ -52,6 +51,7 @@ spacecookieGophermapName = "index.md.mustache"
 type FileName = FilePath
 
 
+-- TODO: wouldn't this be better as a sum type?
 -- | The Markdown parser to use to transform Markdown files to various outputs
 -- (like menus/gophermaps) suitable for gopherspace.
 data ParseType = GopherFileType
@@ -319,13 +319,23 @@ parseMarkdown recipe contents =
       Left parseError -> error $ show parseError
       Right penv -> do
         allTheAsciiFonts <- getAsciiFonts
-        let (GopherFile out') = runReader penv allTheAsciiFonts
+        let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = blankInlineOverrides }
+        let (GopherFile out') = runReader penv env
         writeOut out'
 
   -- Parse the contents as a Gopher menu/gophermap for gopherspace and write out to the target directory.
   parseOutGopherMenu :: IO ()
   parseOutGopherMenu = do
-    out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherMenu))
+    out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherFile))
+    case out of
+      Left parseError -> error $ show parseError
+      Right penv -> do
+        allTheAsciiFonts <- getAsciiFonts
+        let inlineOverrides = InlineOverrides { overrideLink = Just link' }
+        let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = inlineOverrides }
+        let (GopherFile out') = runReader penv env
+        writeOut out'
+    {-
     case out of
       Left parseError -> error $ show parseError
       Right penv -> do
@@ -333,6 +343,7 @@ parseMarkdown recipe contents =
         let out' = runReader penv allTheAsciiFonts
             out'' = gopherMenuToText out'
         writeOut out''
+    -}
 
   -- Don't parse; just copy the file to the target directory.
   noParseOut :: IO ()
