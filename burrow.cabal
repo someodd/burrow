@@ -101,12 +101,9 @@ library
   exposed-modules:
     TextUtils
     TextUtils.Headings
-    Markdown.ToGopherMenu
-    Markdown.ToGopherMenu2
-    Markdown.ToTextFile
+    Markdown
     Mustache
     Build
-    Types
 
   -- Modules included in this library but not exported.
   -- other-modules:
