@@ -70,6 +70,7 @@ common shared-properties
     filepath,
     optparse-applicative,
     mtl,
+    ConfigFile,
     commonmark
 
   -- LANGUAGE extensions used by modules in this package.
@@ -104,6 +105,7 @@ library
     Markdown
     Mustache
     Build
+    Config
 
   -- Modules included in this library but not exported.
   -- other-modules:
