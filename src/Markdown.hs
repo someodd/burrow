@@ -40,7 +40,7 @@ blankInlineOverrides = InlineOverrides { overrideLink = Nothing }
 -- | Stuff to make available to the parser.
 data Environment =
   Environment
-    { envFonts :: Map.Map String AsciiFont
+    { envFonts :: HeadingLevelFontMap
     , envInlineOverrides :: InlineOverrides
     }
 
@@ -132,19 +132,13 @@ instance Rangeable (ParseEnv GopherFile) => IsInline (ParseEnv GopherFile) where
 
 -- should be in common?
 -- | Parse a Markdown heading into a fancy, beautiful ASCII art heading.
-parseHeading' :: Int -> Map.Map String AsciiFont -> Text -> Text
+parseHeading' :: Int -> HeadingLevelFontMap -> Text -> Text
 parseHeading' level fonts ils = T.pack $ headingCompose font $ show ils
  where
-  -- temporary for prototype
-  theFont =
-    case Map.lookup "h1" fonts of
-      Nothing -> error "oh no"
-      Just f -> f
-
   font =
-    case level of
-      1 -> theFont
-      _ -> theFont
+    case Map.lookup level fonts of
+      Just x -> x
+      Nothing -> error $ "No font for level: " ++ show level
 
 -- for ils
 gopherFileOrNull penv func = do
