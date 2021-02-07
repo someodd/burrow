@@ -42,8 +42,22 @@ import Markdown
 import Mustache
 
 
+-- | The extension to use for menus in gopherspace. This is the file extension
+-- the user will use to indicate that the file is a gophermap/menu in the directory
+-- they want to parse/build.
+gophermapExtension = ".menu.md.mustache"
+
+
+-- | Similar to gophermapExtension, except this is for regular text files in gopherspace.
+textFileExtension = ".text.md.mustache"
+
+
 -- | This is the special name for generating spacecookie indexes if enabled (gophermaps).
-spacecookieGophermapName = "index.md.mustache"
+spacecookieGophermapName = "index.menu.md.mustache"
+
+
+-- | The partial extension.
+partialExtension = ".partial"
 
 
 -- NOTE: is there something like this in System.FilePath?
@@ -74,11 +88,15 @@ type ParseSuffix = String
 -- | File extensions and which Markdown parser will be used for them.
 suffixParseMap :: Map.Map ParseSuffix ParseType
 suffixParseMap = Map.fromList
-  [ ("txt.mustache", GopherFileType)
-  , ("md.mustache", GopherMenuType)
+  -- FIXME: it didn't have a period to begin with
+  [ (textFileExtension, GopherFileType)
+  , (gophermapExtension, GopherMenuType)
   ]
 
 
+-- FIXME: the way this is hardcoded is bad (in case extension ever changes)
+-- FIXME: debugging something here was hard because i wasn't using joinpath
+-- everywhere
 -- | Get the appropriate ParseType for the supplied file path.
 --
 -- Burrow relies on the double file extension format of
@@ -87,15 +105,15 @@ suffixParseMap = Map.fromList
 -- Suffixes/extensions which are not mapped to a parser shall 
 -- be marked as Skip.
 --
--- >>> getParseType "some/path/foo/bar/filename.txt.mustache"
+-- >>> getParseType "some/path/foo/bar/filename.text.md.mustache"
 -- GopherFileType
 -- >>> getParseType "some/path/filename.jpg"
 -- Skip
 getParseType :: FilePath -> ParseType
 getParseType filePath =
   case fmap reverse $ splitOn "." (reverse filePath) of
-    maybeMustacheExtension:maybeFileExtension:_ ->
-      let parseSuffix = maybeFileExtension ++ "." ++ maybeMustacheExtension
+    maybeMustacheExtension:"md":maybeFileExtension:_ ->
+      let parseSuffix = "." ++ maybeFileExtension ++ ".md." ++ maybeMustacheExtension
       in case Map.lookup parseSuffix suffixParseMap of
            Just parseType -> parseType
            Nothing -> Skip
@@ -107,10 +125,17 @@ getParseType filePath =
 type FileToParse = (FilePath, ParseType)
 
 
+-- | File pattern for files to parse.
+patternForParse =
+  [ "**/*" ++ textFileExtension
+  , "**/*" ++ gophermapExtension
+  ]
+
+
 -- | Creates a list of files to parse in a given directory, along with which parser to use.
 filesToParse :: FilePath -> IO [FileToParse]
 filesToParse sourceDirectory = do
-  filesMatching <- getDirectoryFiles sourceDirectory ["**/*.txt.mustache", "**/*.md.mustache"]
+  filesMatching <- getDirectoryFiles sourceDirectory patternForParse
   pure $ fmap (\x -> (x, getParseType x)) filesMatching
 
 
@@ -130,13 +155,13 @@ dataForMustache =
   ]
 
 
--- | Match the "somepartial" of */*/*.somepartial.partial.*.mustache
+-- | Match the "somepartial" of */*/*.somepartial.partial.*.md.mustache
 --
 -- Will return Nothing if doesn't use a partial or if the extension isn't
 -- mapped to a Markdown parser.
 --
--- >>> matchPartial "foo/bar/afile.phlogpost.partial.txt.mustache"
--- Just ("phlogpost", ".txt.mustache")
+-- >>> matchPartial "foo/bar/afile.phlogpost.partial.text.md.mustache"
+-- Just ("phlogpost", ".text.md.mustache")
 matchPartial :: FilePath -> Maybe (String, String)
 matchPartial filePath =
   case getParseType filePath of
@@ -145,7 +170,7 @@ matchPartial filePath =
       let filename = takeFileName filePath
           dotSplit = reverse $ splitOn "." filename
       in case dotSplit of
-           "mustache":fileType:"partial":partialName:_ -> Just (partialName, "." ++ fileType ++ ".mustache")
+           "mustache":"md":fileType:"partial":partialName:_ -> Just (partialName, "." ++ fileType ++ ".md.mustache")
            _ -> Nothing
 
 
@@ -285,11 +310,14 @@ parseMarkdown recipe contents =
   case pfrParseType recipe of
     -- NOTE: The way this type is setup seems redundant/adds extra maintenence just use a sumtype like ParseType = GopherFile | GopherMenu? FIXME/NOTE/TODO
     -- Parse the markdown text out as a text file to be served in gopherspace.
-    GopherFileType -> parseOutGopherFile
+    GopherFileType -> do
+      parseOutGopherFile
     -- Parse the markdown text out as a gophermap/menu.
-    GopherMenuType -> parseOutGopherMenu
+    GopherMenuType -> do
+      parseOutGopherMenu
     -- Do not parse this file. Simply copy the file to the new destination!
-    Skip -> noParseOut
+    Skip -> do
+      noParseOut
  where
   -- This is where the file will be writen out to.
   filePath :: FilePath
@@ -334,15 +362,6 @@ parseMarkdown recipe contents =
         let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = inlineOverrides }
         let (GopherFile out') = runReader penv env
         writeOut out'
-    {-
-    case out of
-      Left parseError -> error $ show parseError
-      Right penv -> do
-        allTheAsciiFonts <- getAsciiFonts
-        let out' = runReader penv allTheAsciiFonts
-            out'' = gopherMenuToText out'
-        writeOut out''
-    -}
 
   -- Don't parse; just copy the file to the target directory.
   noParseOut :: IO ()
