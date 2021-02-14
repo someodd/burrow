@@ -10,13 +10,13 @@ module TextUtils
   )
 where
 
-import Data.List
+import Data.List (intercalate, transpose)
 import Data.List.Split (chunksOf)
 
 import qualified Data.Text as Text
 
 import qualified Text.Layout.Table.Justify as Justify
-import Text.Wrap
+import Text.Wrap (WrapSettings(..), wrapTextToLines)
 
 
 -- | The maximum width of the gopherhole page. All the functions use this
