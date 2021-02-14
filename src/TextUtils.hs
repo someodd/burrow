@@ -24,6 +24,7 @@ import Text.Wrap
 maxWidth :: Int
 maxWidth = 79
 
+
 -- TODO: should hyphenate break long words
 -- | Mustache-lambda-friendly function for text justification.
 justify2 :: Text.Text -> Text.Text
@@ -47,31 +48,39 @@ justify string = map (flip addSpaceToNthWord 0) wrappedLines
   wrapSettings = WrapSettings { preserveIndentation = False, breakLongWords = True }
   wrappedLines = map Text.unpack $ wrapTextToLines wrapSettings paragraphWidth (Text.pack string)
 
-  -- should use guards to check for bad cases or be more safe idk
+  -- FIXME: redocument, rename, clean up, refactor this
   addSpaceToNthWord :: String -> Int -> String
-  addSpaceToNthWord l@(a:ax) i
+  addSpaceToNthWord l@(_:_) i
     | paragraphWidth == length l = l
-    | paragraphWidth <= length l = l
+    | paragraphWidth <= length l = l  -- FIXME: this condition shouldn't be happening (the less-than part)
     | otherwise =
         let newI = i `mod` (length $ words l)
             worded = spaceSplitter l
             -- this is wrong need different way to split words so it includes spaces duh
             wordedAdded = intercalate "" (take newI worded ++ [worded !! newI ++ " "] ++ drop (newI + 1) worded)
         in addSpaceToNthWord wordedAdded (i+1)
-  addSpaceToNthWord [] i = error "Can't add space to empty list!"
+  addSpaceToNthWord [] _ = error "Can't add space to empty list!"
 
+  -- FIXME: it's faster to build your lists up back-to-front, which would also remove the need for map reverse.
+  -- instead of x ++ [n], use n : x (which is equivalent to [n] ++ x).
+  --
+  -- Split a string based off of a space (or group of spaces), while preserving
+  -- the delimiter (n-spaces until a nonspace character occurs).
+  --
+  -- This allows for a version of the `words` function which preserves the
+  -- amount of space between words (which is lumped in with the first of those
+  -- two words).
   spaceSplitter :: String -> [String]
-  spaceSplitter string = map reverse (foldr func [] string)
+  spaceSplitter string' = map reverse (foldr func [] string')
     where
       func :: Char -> [String] -> [String]
       func n [] = [[n]]
       func n acc@(x:xs)
-        -- if we're encountering a new nonspace after a space then start a new group
+        -- If we're encountering a new nonspace after the last in the current
+        -- group was a space then start a new group!
         | n /= ' ' && last x == ' ' = [n] : acc
-        -- if we're encountering a space add to current group
-        | n == ' ' = (x ++ " ") : xs
-        -- if we're encountering a nonspace simply add to current group
-        | n /= ' ' = (x ++ [n]) : xs
+        -- Otherwise, it follows, we're encountering something to add to the current group.
+        | otherwise = (x ++ [n]) : xs
 
 
 -- | Mustache-lambda-friendly version of the columnate function, meaning it has preconfigured
