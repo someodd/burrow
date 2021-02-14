@@ -17,24 +17,21 @@ where
 
 import System.Directory (copyFile)
 import Data.HashMap.Strict as H
-import           Data.Text (unpack, pack, Text, toUpper)
 import Data.List (isSuffixOf)
 import Data.Foldable (traverse_)
-import System.FilePath (takeDirectory, takeFileName, FilePath)
+import System.FilePath (takeDirectory, takeFileName)
 
 import qualified Data.Text as T
+
 import System.Directory (createDirectoryIfMissing)
 import System.FilePattern.Directory
 import Data.List.Split (splitOn)
 import qualified Data.Map as Map
 import Commonmark hiding (addAttribute, escapeURI)
-import           Commonmark.Types
-import           Commonmark.Entity (lookupEntity)
 import Text.Mustache
 import qualified Text.Mustache.Types as Mtype
 
 import Control.Monad.Reader
-import qualified Data.Text as Text
 
 import TextUtils
 import TextUtils.Headings
@@ -45,23 +42,26 @@ import Mustache
 -- | The extension to use for menus in gopherspace. This is the file extension
 -- the user will use to indicate that the file is a gophermap/menu in the directory
 -- they want to parse/build.
+gophermapExtension :: ParseSuffix
 gophermapExtension = ".menu.md.mustache"
 
 
 -- | Similar to gophermapExtension, except this is for regular text files in gopherspace.
+textFileExtension :: ParseSuffix
 textFileExtension = ".text.md.mustache"
 
 
 -- | This is the special name for generating spacecookie indexes if enabled (gophermaps).
+spacecookieGophermapName :: String
 spacecookieGophermapName = "index.menu.md.mustache"
 
 
--- | The partial extension.
-partialExtension = ".partial"
-
-
--- NOTE: is there something like this in System.FilePath?
-type FileName = FilePath
+-- | The partial name used in the extension but also used when inserting tempaltes into
+-- the partial namespace for Mustache when using partial templates.
+--
+-- An important note: excludes the leading dot as you might expect from file extensions.
+partialExtension :: T.Text
+partialExtension = "partial"
 
 
 -- TODO: wouldn't this be better as a sum type?
@@ -126,6 +126,7 @@ type FileToParse = (FilePath, ParseType)
 
 
 -- | File pattern for files to parse.
+patternForParse :: [String]
 patternForParse =
   [ "**/*" ++ textFileExtension
   , "**/*" ++ gophermapExtension
@@ -146,7 +147,7 @@ filesToParse sourceDirectory = do
 --
 -- These substitutions are later modified to include a Mustache partial for
 -- the Burrow template/partial system.
-dataForMustache :: [(Text.Text, Mtype.Value)]
+dataForMustache :: [(T.Text, Mtype.Value)]
 dataForMustache =
   [ ("title", Mtype.String "My Gopherhole")
   , ("justify2", overText justify2)
@@ -170,6 +171,8 @@ matchPartial filePath =
       let filename = takeFileName filePath
           dotSplit = reverse $ splitOn "." filename
       in case dotSplit of
+          -- FIXME: this feels very hardcoded. Should use some of the variables for file extensions
+          -- as well as the partialExtension variable.
            "mustache":"md":fileType:"partial":partialName:_ -> Just (partialName, "." ++ fileType ++ ".md.mustache")
            _ -> Nothing
 
@@ -200,7 +203,7 @@ parseFile sourceDirectory destinationDirectory spaceCookie (filePath, parseType)
     let partial'sTemplatePath = "templates/" ++ templateToUse ++ extension
     partial <- readFile filePathIncludingSourceDirectory
     -- FIXME, TODO: it feels like this is being done twice!
-    let newDataForMustache = ("partial", Mtype.String (pack partial)):dataForMustache
+    let newDataForMustache = (partialExtension, Mtype.String (T.pack partial)):dataForMustache
     pure $ ParseFileRecipe
              { pfrSourceDirectory = sourceDirectory
              , pfrDestinationDirectory = destinationDirectory
@@ -228,8 +231,9 @@ parseFile sourceDirectory destinationDirectory spaceCookie (filePath, parseType)
 
 
 -- FIXME: what is this even?!
-getCompiledTemplate searchSpace templateToRenderPath = do
-  compiled <- automaticCompile searchSpace templateToRenderPath
+getCompiledTemplate :: [FilePath] -> FilePath -> IO Template
+getCompiledTemplate searchSpace' templateToRenderPath = do
+  compiled <- automaticCompile searchSpace' templateToRenderPath
   case compiled of
     Left err -> error $ show err
     Right template -> pure template
@@ -254,7 +258,7 @@ data ParseFileRecipe = ParseFileRecipe
   , pfrIncludePartial :: Maybe FilePath
   -- ^ If a partial is being used, the main file to be parsed is instead specified here,
   -- so it may be loaded as a partial named "partial" in the template/.
-  , pfrSubstitutions :: [(Text.Text, Mtype.Value)]
+  , pfrSubstitutions :: [(T.Text, Mtype.Value)]
   -- ^ The substitutions to be used when parsing the mustache template. You can think of these
   -- as globals or putting things into scope. But it all needs to be a commonmark value: a
   -- string, a function, a partial.
@@ -263,7 +267,7 @@ data ParseFileRecipe = ParseFileRecipe
 
 -- TODO: prepareTemplate = do
 -- | Prepares the file which needs to be parsed as a Mustache template.
-parseMustache :: ParseFileRecipe -> IO Text.Text
+parseMustache :: ParseFileRecipe -> IO T.Text
 parseMustache recipe = do
   secondaryTemplate <- case pfrIncludePartial recipe of
                          Just contentToParsePath -> getCompiledTemplate searchSpace contentToParsePath
@@ -278,7 +282,7 @@ parseMustache recipe = do
                       -- templates/.
                      -- FIXME: wait considering below is inserting secondarytemplate as the partial is this all wrong :ooo
                       -- FIXME: what the hell is the below line doing?!
-                      let templateCache = H.insert "partial" secondaryTemplate (partials secondaryTemplate)
+                      let templateCache = H.insert (T.unpack partialExtension) secondaryTemplate (partials secondaryTemplate)
                       compiled' <- compileTemplateWithCache searchSpace templateCache (pfrTemplateToRender recipe)
                       case compiled' of
                         Left err -> error $ show err
@@ -288,7 +292,7 @@ parseMustache recipe = do
   -- could put this in the prepareTemplate?
       -- should put this stuff in Mustache
   -- FIXME: what's happening here?!
-  let k = Map.fromList (pfrSubstitutions recipe) :: Map.Map Text.Text Mtype.Value
+  let k = Map.fromList (pfrSubstitutions recipe) :: Map.Map T.Text Mtype.Value
       -- where is this substitute function coming from?! is it commonmark to preform the partial substitution?
       testContents = substitute mainTemplate k
 
@@ -305,7 +309,7 @@ writeOutBasedOn recipe = do
 
 
 -- FIXME: this does too much, including writing out. should just give back bytes or something idk
-parseMarkdown :: ParseFileRecipe -> Text.Text -> IO ()
+parseMarkdown :: ParseFileRecipe -> T.Text -> IO ()
 parseMarkdown recipe contents =
   case pfrParseType recipe of
     -- NOTE: The way this type is setup seems redundant/adds extra maintenence just use a sumtype like ParseType = GopherFile | GopherMenu? FIXME/NOTE/TODO
@@ -328,7 +332,7 @@ parseMarkdown recipe contents =
 
   -- Write text to the target/built directory, creating directories in the process if needed.
   -- Will also write out to the file name .gophermap if the input file name matched spacecookieGophermapName.
-  writeOut :: Text.Text -> IO ()
+  writeOut :: T.Text -> IO ()
   writeOut text = do
     let outPath =
           if (pfrSpacecookie recipe) && spacecookieGophermapName `isSuffixOf` filePath
@@ -358,7 +362,8 @@ parseMarkdown recipe contents =
       Left parseError -> error $ show parseError
       Right penv -> do
         allTheAsciiFonts <- getAsciiFonts
-        let inlineOverrides = InlineOverrides { overrideLink = Just link' }
+        -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
+        let inlineOverrides = InlineOverrides { overrideLink = Just createGopherMenuLink }
         let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = inlineOverrides }
         let (GopherFile out') = runReader penv env
         writeOut out'

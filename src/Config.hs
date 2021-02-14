@@ -4,8 +4,6 @@
 -- altering the gopherhole building process.
 module Config (getConfig, getConfigValue) where
 
-import System.FilePath
-
 import Data.ConfigFile
 
 

@@ -17,7 +17,6 @@ where
 
 import Data.Char
 import Data.List (transpose, intercalate)
-import Data.Maybe (maybe)
 
 import Data.List.Split (splitOn)
 import qualified Data.Map as Map
@@ -45,7 +44,7 @@ parseFont path = do
   splitIntoCharLegends = splitOn "\n\n"
   charLegendsToPair charLegend =
     case lines charLegend of
-      x:[] -> error "Char legend misformatted."
+      _:[] -> error "Char legend misformatted."
       x:xs ->
         case x of
           c:[] -> (c, xs)
@@ -79,10 +78,10 @@ getAsciiFonts = do
 fontLookup :: Char -> AsciiFont -> Maybe [String]
 fontLookup c f =
   case Map.lookup c f of
-    Nothing -> dothing c
+    Nothing -> dothing
     x -> x
  where
-  dothing c
+  dothing
     | isAsciiLower c = Map.lookup (toUpper c) f
     | isAsciiUpper c = Map.lookup (toLower c) f
     | otherwise = Nothing
@@ -105,12 +104,12 @@ headingCompose font string = "\n" ++ composeJoin
   characterHeight :: Int
   characterHeight = getCharacterHeight font
 
-  fontLetter :: AsciiFont -> Char -> [String]
-  fontLetter font c =
+  fontLetter :: Char -> [String]
+  fontLetter c =
     case fontLookup c font of
       Just a -> a
       Nothing -> replicate characterHeight ""
 
-  convert = map (fontLetter font) string
+  convert = map fontLetter string
 
   composeJoin = unlines $ map (intercalate "") $ transpose convert

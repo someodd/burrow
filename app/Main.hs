@@ -4,7 +4,6 @@ module Main where
 
 import Build
 
-import Data.Semigroup ((<>))
 import Options.Applicative hiding (ParseError)
 
 -- | Model for the CLI options
