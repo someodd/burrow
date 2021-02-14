@@ -33,7 +33,6 @@ import qualified Text.Mustache.Types as Mtype
 
 import Control.Monad.Reader
 
-import TextUtils
 import TextUtils.Headings
 import Markdown
 import Mustache
@@ -140,22 +139,6 @@ filesToParse sourceDirectory = do
   pure $ fmap (\x -> (x, getParseType x)) filesMatching
 
 
--- | Global variables which can be access by a Mustache file being parsed.
---
--- These are the "substitutions" for Mustache. These are functions (lambdas),
--- and regular string values.
---
--- These substitutions are later modified to include a Mustache partial for
--- the Burrow template/partial system.
-dataForMustache :: [(T.Text, Mtype.Value)]
-dataForMustache =
-  [ ("title", Mtype.String "My Gopherhole")
-  , ("justify2", overText justify2)
-  , ("justify", overText justify')
-  , ("columnate2", overText columnate2)
-  ]
-
-
 -- | Match the "somepartial" of */*/*.somepartial.partial.*.md.mustache
 --
 -- Will return Nothing if doesn't use a partial or if the extension isn't
@@ -229,14 +212,6 @@ parseFile sourceDirectory destinationDirectory spaceCookie (filePath, parseType)
       , pfrSubstitutions = dataForMustache
       }
 
-
--- FIXME: what is this even?!
-getCompiledTemplate :: [FilePath] -> FilePath -> IO Template
-getCompiledTemplate searchSpace' templateToRenderPath = do
-  compiled <- automaticCompile searchSpace' templateToRenderPath
-  case compiled of
-    Left err -> error $ show err
-    Right template -> pure template
 
 
 -- | All the settings for a function (`writeOutBasedOn`) to parse a file
