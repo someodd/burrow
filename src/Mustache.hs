@@ -4,11 +4,17 @@ module Mustache
   ( searchSpace
   , getCompiledTemplate
   , dataForMustache
+  , automaticCompileText
   ) where
 
 import qualified Data.Text as T
 
-import Text.Mustache (overText, automaticCompile, Template)
+--import Control.Arrow ((&&&))
+import qualified Data.HashMap.Strict as H
+import Text.Mustache.Compile
+import Text.Mustache
+import Text.Mustache.Parser
+--import Text.Mustache (compileTemplate, overText, automaticCompile, Template)
 import qualified Text.Mustache.Types as Mtype
 
 import TextUtils
@@ -17,6 +23,49 @@ import TextUtils
 -- | This is where Mustache will look for files, especially for partials.
 searchSpace :: [FilePath]
 searchSpace = ["./templates", "."]
+
+
+-- FIXME: doesn't parse partials!
+-- | This is like `automaticCompile`, except we use `Text`.
+--
+-- Based of the documentation in Text.Mustache.Compile:
+--
+--  "The same can be done manually using getFile, mustacheParser and
+--  getPartials."
+--    { name     :: String
+--  , ast      :: STree
+--  , partials :: TemplateCache
+--
+--  Used for the main document parsing, I guess?
+automaticCompileText :: T.Text -> IO Template
+automaticCompileText templateToRenderText = do
+  template <- compileTemplate'
+  let [t] = template
+  pure t
+  {-
+  case template of
+    Left err -> error $ show err
+    Right template' -> pure template'
+  -}
+ where
+  compileTemplate' = do
+    let mainPartialAST =
+          case parse "partial" templateToRenderText of
+            Left err -> error $ show err
+            Right ast' -> ast'
+        partials' = getPartials mainPartialAST
+    partialTemplates <- traverse (getCompiledTemplate searchSpace) partials'
+    let templateCache = H.fromList (zip partials' partialTemplates)
+    pure $ fmap (flip (Template "partial") templateCache) [mainPartialAST]
+
+
+{-
+let templateCache = H.insert (T.unpack partialExtension) secondaryTemplate (partials secondaryTemplate)
+compiled' <- compileTemplateWithCache searchSpace templateCache (pfrTemplateToRender recipe')
+case compiled' of
+  Left err -> error $ show err
+  Right template -> pure template
+-}
 
 
 -- FIXME: what is this even?!

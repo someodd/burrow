@@ -5,6 +5,8 @@ It's like a *static site generator,* but for gopherholes (places in gopherspace 
 
 Use [Mustache](https://mustache.github.io/) templates of Markdown (specifically Commonmark) to create gophermaps/menus and text files. Through the use of Mustache lambdas, partial templates, Markdown, and file extensions you can turn this file (`special.headfoot.partial.menu.md.mustache`):
 
+Written in Haskell. If you're looking for very similar software, with coincidentally the exact same name, please check out [James Tomasino's Burrow](https://github.com/jamestomasino/burrow).
+
 ```
 ## Columnate example
 

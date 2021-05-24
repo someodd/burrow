@@ -23,7 +23,7 @@ data Opts = Opts
 main :: IO ()
 main = do
   opts <- execParser optsParser
-  doTheParsing (optSourceDir opts) (optDestDir opts) (optSpacecookie opts)
+  buildGopherhole (optSourceDir opts) (optDestDir opts) (optSpacecookie opts)
  where
   optsParser :: ParserInfo Opts
   optsParser =
