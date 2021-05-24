@@ -48,6 +48,7 @@ extra-source-files:
   README.md
   CHANGELOG.md
 
+-- FIXME: need to pin version
 common shared-properties
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror
 
@@ -68,7 +69,11 @@ common shared-properties
     optparse-applicative,
     mtl,
     ConfigFile,
-    commonmark
+    commonmark,
+    frontmatter,
+    attoparsec,
+    vector,
+    yaml
 
   -- LANGUAGE extensions used by modules in this package.
   other-extensions:    OverloadedStrings
@@ -103,6 +108,8 @@ library
     Mustache
     Build
     Config
+    FrontMatter
+    Common
 
   -- Modules included in this library but not exported.
   -- other-modules:

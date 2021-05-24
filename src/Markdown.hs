@@ -20,6 +20,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 
 import TextUtils.Headings
+--import Common
 
 
 -- | Override certain inline instance methods for the parser.
