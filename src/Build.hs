@@ -184,7 +184,7 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
 -- NOTE: a good place to add hooks?
 -- TODO: return index/state? the tag index can be expanded to a more general crawler later to have
 -- a hook to do a bunch of stuf with accumulated frontmatter or something?
-renderFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO (Maybe FrontMatter)
+renderFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO (FilePath, Maybe FrontMatter)
 renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath, parseType) = do
   recipe <- createRenderRecipe sourceDirectory destinationDirectory spaceCookie sourceFile
   -- TODO/FIXME: you have to implement frontmatter parsing here and pass off the modified
@@ -199,7 +199,7 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
   if parseType == Skip
     then do
       _ <- noParseOut recipe
-      pure Nothing
+      pure (fst sourceFile, Nothing)
     else do
       -- TODO: get and remove frontmatter here
       -- FIXME: parseMustache should NOT load the main file by hand! we should do that
@@ -215,8 +215,8 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
       -- FIXME: output to text instead ^ and then we can also easily handle how to write out?
       -- should have function yeah? this will make chaining manipulations easier?
       case frontMatter of
-        Just _ -> pure frontMatter
-        Nothing -> pure Nothing
+        Just _ -> pure (fst sourceFile, frontMatter)
+        Nothing -> pure (fst sourceFile, Nothing)
  where
   -- Don't parse; just copy the file to the target directory.
   noParseOut :: FileRenderRecipe -> IO ()
@@ -378,11 +378,5 @@ parseMarkdown recipe contents =
 buildGopherhole :: FilePath -> FilePath -> Bool -> IO ()
 buildGopherhole sourceDir destDir spaceCookie = do
   sourceFiles <- getSourceFiles sourceDir :: IO [SourceFile]
-  frontMatterCollection <- traverse (renderFile sourceDir destDir spaceCookie) sourceFiles
-
-  -- a mapping of filepath to frontmatter
-  let filePathFrontMatter = zip (map fst sourceFiles) frontMatterCollection
-
-  -- here is where we should have a build tag indexes function from frontmatter
-  let tagIndex = makeTagIndex filePathFrontMatter
-  writeTagIndex destDir tagIndex
+  filePathFrontMatter <- traverse (renderFile sourceDir destDir spaceCookie) sourceFiles
+  renderTagIndexes destDir filePathFrontMatter
