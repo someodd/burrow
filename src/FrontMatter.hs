@@ -1,8 +1,17 @@
+-- | Implements YAML headers of plaintext files in order to specify
+-- metadata, like tagging blog posts. This is modelled after Jekyll's
+-- FrontMatter: https://jekyllrb.com/docs/front-matter/
+--
+-- Here's an example of tagging a blog post:
+--
+--   ---
+--   tags: [foo, bar]
+--   ---
+--   blog content here
+--
+-- ...
 {-# LANGUAGE OverloadedStrings          #-}
--- | Implements Front Matter like from Jekyll.
-
--- FIXME: separate out phlog stuff? make phlogging package?
-module FrontMatter where
+module FrontMatter (renderTagIndexes, getFrontMatter, FrontMatter) where
 
 import System.FilePath (takeDirectory)
 import System.Directory (createDirectoryIfMissing)
@@ -19,18 +28,17 @@ import Data.List (intercalate, isSuffixOf)
 import Common (gophermapSuffix, textFileSuffix)
 
 
-tagDirectoryName :: FilePath
-tagDirectoryName = "tags"
-
--- | Front Matter that is useful for Burrow.
+-- | FrontMatter that is particularly useful for Burrow.
 data FrontMatter = FrontMatter
   { tags :: ![Text]-- what if space separated list of tags? TODO: for jekyll frontmatter spec
   } deriving (Show)
 
+-- TODO: better document
+-- | The parser used for creating `FrontMatter` types.
 instance FromJSON FrontMatter where
   parseJSON = withObject "FrontMatter" $ \o -> FrontMatter <$> o .: "tags"
 
-
+-- TODO: document
 frontmatterBurrow :: Parser FrontMatter
 frontmatterBurrow = frontmatterYaml' <?> "frontmatterBurrow"
   where
@@ -41,7 +49,7 @@ frontmatterBurrow = frontmatterYaml' <?> "frontmatterBurrow"
             --Left e -> fail (show e)
             Right v -> return v
 
-
+-- TODO: document
 -- FIXME: doesn't need filepath
 -- FIXME: associate filepath with the value and stuff?
 getFrontMatter :: FilePath -> T.Text -> (Maybe FrontMatter, T.Text)
@@ -67,7 +75,7 @@ makeTagIndex :: [(FilePath, Maybe FrontMatter)] -> TagIndex
 makeTagIndex pairs =
   HashMap.fromListWith (++) $ [(tag, [filePath]) | (filePath, Just fm) <- pairs, tag <- tags fm]
 
--- FIXME: sort by pubdate?
+-- TODO: sort by pubdate?
 -- FIXME: TagIndex should be more robust and not just store the file path but more info as well. maybe frontmatter should be modified to include the filepath! although it could just include more metadata like pubdate etc etc to make it more useful...
 -- | Write out tag indexes to a directory...
 writeTagIndex :: FilePath -> TagIndex -> IO ()
@@ -111,3 +119,13 @@ writeTagIndex outputDirectory tagIndex = do
   tagIndexContents tag =
     -- fromjust bad!
     (T.unpack tag) ++ "\n\n" ++ (intercalate "\n" . map makeLocalLink . fromJust $ HashMap.lookup tag tagIndex)
+
+
+-- | Render the tag indexes from a collection of file paths and their
+-- associated `FrontMatter`, which contains the tags for that file.
+--
+-- The tags are written out to the supplied `FilePath`.
+renderTagIndexes :: FilePath -> [(FilePath, Maybe FrontMatter)] ->  IO ()
+renderTagIndexes destDir filePathFrontMatter =
+  let tagIndex = makeTagIndex filePathFrontMatter
+  in writeTagIndex destDir tagIndex
