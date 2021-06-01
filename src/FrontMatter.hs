@@ -21,22 +21,23 @@ import qualified Data.HashMap.Strict as HashMap
 import Data.Attoparsec.ByteString ((<?>))
 import Data.ByteString as ByteString hiding (isSuffixOf, take, intercalate, map, foldr, writeFile)
 import Data.Frontmatter
-import Data.Yaml (FromJSON, parseJSON, withObject, (.:), decodeEither')
+import Data.Yaml (FromJSON, parseJSON, withObject, (.:?), (.:), decodeEither')
 import Data.Text.Encoding         as T
 import Data.Text as T hiding (isSuffixOf, take, map, foldr, intercalate)
-import Data.List (intercalate, isSuffixOf)
+import Data.List (sortOn, intercalate, isSuffixOf)
 import Common (gophermapSuffix, textFileSuffix)
 
 
 -- | FrontMatter that is particularly useful for Burrow.
 data FrontMatter = FrontMatter
   { tags :: ![Text]-- what if space separated list of tags? TODO: for jekyll frontmatter spec
+  , date :: Maybe Text
   } deriving (Show)
 
 -- TODO: better document
 -- | The parser used for creating `FrontMatter` types.
 instance FromJSON FrontMatter where
-  parseJSON = withObject "FrontMatter" $ \o -> FrontMatter <$> o .: "tags"
+  parseJSON = withObject "FrontMatter" $ \o -> FrontMatter <$> o .: "tags" <*> o .:? "date"
 
 -- TODO: document
 frontmatterBurrow :: Parser FrontMatter
@@ -73,7 +74,14 @@ type TagIndex = HashMap.HashMap T.Text [FilePath]
 
 makeTagIndex :: [(FilePath, Maybe FrontMatter)] -> TagIndex
 makeTagIndex pairs =
-  HashMap.fromListWith (++) $ [(tag, [filePath]) | (filePath, Just fm) <- pairs, tag <- tags fm]
+  HashMap.fromListWith (++) $ sorted
+ where
+  unsorted :: [(T.Text, [(FilePath, Maybe T.Text)])]
+  unsorted = [(tag, [(filePath, date fm)]) | (filePath, Just fm) <- pairs, tag <- tags fm]
+
+  -- needs to be sorted by date, descending
+  sorted :: [(T.Text, [FilePath])]
+  sorted = map (\(tag, fileDateList) -> (tag, map fst $ sortOn snd fileDateList)) unsorted
 
 -- TODO: sort by pubdate?
 -- FIXME: TagIndex should be more robust and not just store the file path but more info as well. maybe frontmatter should be modified to include the filepath! although it could just include more metadata like pubdate etc etc to make it more useful...
