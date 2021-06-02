@@ -73,6 +73,8 @@ common shared-properties
     frontmatter,
     attoparsec,
     vector,
+    time,
+    fuzzy-dates,
     yaml
 
   -- LANGUAGE extensions used by modules in this package.
