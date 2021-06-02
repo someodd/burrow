@@ -2,7 +2,7 @@
 --
 -- The user can use the configuration file to tweak various settings
 -- altering the gopherhole building process.
-module Config (getConfig, getConfigValue) where
+module Config (getConfig, getConfigValue, ConfigParser) where
 
 import Data.ConfigFile
 

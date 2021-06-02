@@ -379,4 +379,5 @@ buildGopherhole :: FilePath -> FilePath -> Bool -> IO ()
 buildGopherhole sourceDir destDir spaceCookie = do
   sourceFiles <- getSourceFiles sourceDir :: IO [SourceFile]
   filePathFrontMatter <- traverse (renderFile sourceDir destDir spaceCookie) sourceFiles
-  renderTagIndexes destDir filePathFrontMatter
+  renderTagIndexes filePathFrontMatter
+  renderPhlogIndex filePathFrontMatter
