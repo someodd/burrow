@@ -124,6 +124,7 @@ writeTagIndex tagIndex = do
   -- | Write the index of tag indexes! This makes it so the user can see all the tags and
   -- see five example posts (should make this sorted by date...) should include instead of
   -- filepath include a bunch of data necessary for building the indexes.
+  makeMainTagIndex :: FilePath -> String
   makeMainTagIndex tagIndexDirectory =
     -- fromjust is bad
     -- FIXME: this kleisli function is a hack because no fm was included in tag index at the moment
