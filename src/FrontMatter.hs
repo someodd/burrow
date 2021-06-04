@@ -2,52 +2,54 @@
 -- metadata, like tagging blog posts. This is modelled after Jekyll's
 -- FrontMatter: https://jekyllrb.com/docs/front-matter/
 --
--- Here's an example of tagging a blog post:
+-- Here's an example:
 --
 --   ---
 --   tags: [foo, bar]
+--   date: March 3rd, 2021 at 2:24pm
 --   ---
 --   blog content here
 --
--- ...
+-- Also handles the creation of tag and the main indexes for the phlog.
+-- Phlogging tools in general.
 {-# LANGUAGE OverloadedStrings          #-}
 module FrontMatter (renderMainPhlogIndex, renderTagIndexes, getFrontMatter, FrontMatter) where
 
-import Control.Monad.Reader
+import Control.Monad.Reader (runReader, Reader, ask)
 import Control.Arrow ((&&&))
-import Data.Time.Calendar
-import Data.Time.Clock
+import Data.Time.Calendar (toGregorian)
+import Data.Time.Clock (getCurrentTime, utctDay)
 import qualified Data.Dates.Parsing as DP
 import System.FilePath (takeDirectory)
 import System.Directory (createDirectoryIfMissing)
 import Data.Foldable (traverse_)
-import Data.Maybe
+import Data.Maybe (fromMaybe, fromJust)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Attoparsec.ByteString ((<?>))
-import Data.ByteString as ByteString hiding (head, isSuffixOf, take, intercalate, map, foldr, writeFile)
-import Data.Frontmatter
+import qualified Data.ByteString as ByteString
+import Data.Frontmatter (Parser, IResult(..), frontmatter, parse)
 import Data.Yaml (FromJSON, parseJSON, withObject, (.:?), (.:), decodeEither')
 import Data.Text.Encoding         as T
-import Data.Text as T hiding (head, isSuffixOf, take, map, foldr, intercalate)
+import qualified Data.Text as T
 import Data.List (sortOn, intercalate, isSuffixOf)
 
 import Config (getConfig, getConfigValue, ConfigParser)
 import Common (gophermapSuffix, textFileSuffix)
 
 
--- | FrontMatter that is particularly useful for Burrow.
+-- | Representation of the FrontMatter found in a file.
 data FrontMatter = FrontMatter
-  { tags :: ![Text]-- what if space separated list of tags? TODO: for jekyll frontmatter spec
-  , date :: Maybe Text
-  , title :: Maybe Text
+  { tags :: ![T.Text]-- FIXME: what if space separated list of tags? TODO: for jekyll frontmatter spec requires to have a list or space separated
+  , date :: Maybe T.Text
+  , title :: Maybe T.Text
   } deriving (Show)
 
--- TODO: better document
--- | The parser used for creating `FrontMatter` types.
+-- TODO: better document... where does this come into play?
 instance FromJSON FrontMatter where
   parseJSON = withObject "FrontMatter" $ \o -> FrontMatter <$> o .: "tags" <*> o .:? "date" <*> o .:? "title"
 
--- TODO: document
+-- TODO: docs, I don't know what's happening here. i have to refresh myself.
+-- | The parser to be used by `parse`.
 frontmatterBurrow :: Parser FrontMatter
 frontmatterBurrow = frontmatterYaml' <?> "frontmatterBurrow"
   where
@@ -58,11 +60,10 @@ frontmatterBurrow = frontmatterYaml' <?> "frontmatterBurrow"
             --Left e -> fail (show e)
             Right v -> return v
 
--- TODO: document
--- FIXME: doesn't need filepath
--- FIXME: associate filepath with the value and stuff?
-getFrontMatter :: FilePath -> T.Text -> (Maybe FrontMatter, T.Text)
-getFrontMatter _ text = do
+-- TODO, FIXME: comments, docs
+-- | Get the `FrontMatter` from text contents, if there is any frontmatter present.
+getFrontMatter :: T.Text -> (Maybe FrontMatter, T.Text)
+getFrontMatter text = do
   let bsText = T.encodeUtf8 text
       result = parse frontmatterBurrow bsText
   case result of
@@ -77,10 +78,10 @@ getFrontMatter _ text = do
         --  and then the rest of the doc
       Fail _ _ _ -> (Nothing, text)
 
-
+-- | Represents different kinds of phlog indexes and the tools required to do
+-- things with them.
 class PhlogIndex a where
   -- can derive these
-  --createIndex :: PostPageMeta -> a
   --createRSS :: PostPageMeta -> String?
   -- writeRSS :: a -> IO ()
 
@@ -105,7 +106,7 @@ instance PhlogIndex MainPhlogIndex where
     -- filepath/frontmatter pairs.
     makePhlogIndex :: PostPageMeta -> Integer -> PostPageMeta
     makePhlogIndex meta defaultYear =
-      sortOn (\y -> snd y >>= \fm -> dateStringToEpoch defaultYear <$> date fm) meta
+      sortOn (\y -> snd y >>= \fm -> dateStringToDateTime defaultYear <$> date fm) meta
 
   writeIndex (MainPhlogIndex mainPhlogIndex) = do
     -- TODO: list main tag index
@@ -220,17 +221,18 @@ renderTagIndexes filePathFrontMatter = do
 -- | Pairs of filepaths associated with their frontmatter. Useful for posts and pages.
 type PostPageMeta = [(FilePath, Maybe FrontMatter)]
 
-{-
--- could have [(FIlePath, Maybe FrontMatter)] have many types/type synonyms?
--- like AllTagsIndex and SpecificTagIndex
-class PhlogIndex a where
-  writeIndex :: String
-  writeIndex .. = ...
--}
 
-
-dateStringToEpoch :: Integer -> T.Text -> DP.DateTime
-dateStringToEpoch defaultYear dateText = head $ DP.extractDateTimesY (fromIntegral defaultYear :: Int) (T.unpack dateText)
+-- FIXME: could error out (usage of `head`)
+-- | Fuzzy match a date time string (for a `FrontMatter` date/time definition).
+--
+-- `extractDateTimesY` does all the heavy lifting.
+--
+-- >>> dateStringToDateTime (2021 :: Integer) (T.pack "july 29")
+-- DateTime {dtDate = Date {dateYear = 2021, dateMonth = July, dateDay = 29}, dtTime = TimeOfDay {todHour = 0h, todMin = 0m, todSec = 0s, todNSec = 0ns}}
+-- >>> dateStringToDateTime (2021 :: Integer) (T.pack "2021-06-20T04:30")
+-- DateTime {dtDate = Date {dateYear = 2021, dateMonth = June, dateDay = 20}, dtTime = TimeOfDay {todHour = 0h, todMin = 0m, todSec = 0s, todNSec = 0ns}}
+dateStringToDateTime :: Integer -> T.Text -> DP.DateTime
+dateStringToDateTime defaultYear dateText = head $ DP.extractDateTimesY (fromIntegral defaultYear :: Int) (T.unpack dateText)
 
 
 -- | A useful tool in making phlog indexes: create a nice link for the menu
@@ -273,6 +275,3 @@ instance Show MenuLink where
         secondPart =
           fromMaybe "" (server ml >>= \x -> port ml >>= \y -> Just $ "\t" ++ x ++ "\t" ++ (show y))
     in firstPart ++ secondPart
-
-
-
