@@ -77,69 +77,79 @@ getFrontMatter _ text = do
       Fail _ _ _ -> (Nothing, text)
 
 
-type TagIndex = HashMap.HashMap T.Text [FilePath]
 
-makeTagIndex :: PostPageMeta -> TagIndex
-makeTagIndex pairs =
-  HashMap.fromListWith (++) $ sorted
- where
-  unsorted :: [(T.Text, [(FilePath, Maybe T.Text)])]
-  unsorted = [(tag, [(filePath, date fm)]) | (filePath, Just fm) <- pairs, tag <- tags fm]
+class PhlogIndex a where
+  -- can derive these
+  --createIndex :: PostPageMeta -> a
+  --createRSS :: PostPageMeta -> String?
+  -- writeRSS :: a -> IO ()
+  createIndex :: PostPageMeta -> a
+  writeIndex :: a -> IO ()
 
-  -- needs to be sorted by date, descending
-  sorted :: [(T.Text, [FilePath])]
-  sorted = map (\(tag, fileDateList) -> (tag, map fst $ sortOn snd fileDateList)) unsorted
+newtype SpecificTagIndex = SpecificTagIndex (HashMap.HashMap T.Text [FilePath])
 
--- FIXME: tag index needs to use frontmatter again not just paths?
--- TODO/FIXME: it's called write but it's really doing heavy lifting for parsing list into files?
--- TODO: sort by pubdate?
--- FIXME: TagIndex should be more robust and not just store the file path but more info as well. maybe frontmatter should be modified to include the filepath! although it could just include more metadata like pubdate etc etc to make it more useful...
--- | Write out tag indexes to a directory...
-writeTagIndex :: TagIndex -> IO ()
-writeTagIndex tagIndex = do
-  -- get paths from config
-  configParser <- getConfig
-  buildPath <- getConfigValue configParser "general" "buildPath"
-  tagPath <- getConfigValue configParser "phlog" "tagPath"
-  let mainTagIndexPath = buildPath ++ "/" ++ tagPath ++ "/.gophermap"
+instance PhlogIndex SpecificTagIndex where
+  createIndex postPageMetaPairs =
+    SpecificTagIndex $ HashMap.fromListWith (++) $ sorted
+   where
+    unsorted :: [(T.Text, [(FilePath, Maybe T.Text)])]
+    unsorted = [(tag, [(filePath, date fm)]) | (filePath, Just fm) <- postPageMetaPairs, tag <- tags fm]
 
-  -- write out the main tag index
-  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
-  writeFile mainTagIndexPath (makeMainTagIndex tagPath)
+    -- needs to be sorted by date, descending
+    sorted :: [(T.Text, [FilePath])]
+    sorted = map (\(tag, fileDateList) -> (tag, map fst $ sortOn snd fileDateList)) unsorted
 
-  traverse_ (writeTagIndexF configParser) allTags
- where
-  writeTagIndexF :: ConfigParser -> T.Text -> IO ()
-  writeTagIndexF configParser tag = do
-    tagIndexPath <- getConfigValue configParser "phlog" "tagPath"
+  -- FIXME: wayyyyy too big and complicated!!!
+  writeIndex (SpecificTagIndex specificTagIndex) = do
+    -- FIXME: tag index needs to use frontmatter again not just paths?
+    -- TODO/FIXME: it's called write but it's really doing heavy lifting for parsing list into files?
+    -- TODO: sort by pubdate?
+    -- FIXME: TagIndex should be more robust and not just store the file path but more info as well. maybe frontmatter should be modified to include the filepath! although it could just include more metadata like pubdate etc etc to make it more useful...
+    -- | Write out tag indexes to a directory...
+    -- get paths from config
+    configParser <- getConfig
     buildPath <- getConfigValue configParser "general" "buildPath"
-    let outputPath = buildPath ++ "/" ++ tagIndexPath ++ "/" ++ (T.unpack tag) ++ "/.gophermap"
-        outputDirectoryPath = takeDirectory outputPath
-    createDirectoryIfMissing True outputDirectoryPath
-    writeFile outputPath (tagIndexContents tag)
+    tagPath <- getConfigValue configParser "phlog" "tagPath"
+    let mainTagIndexPath = buildPath ++ "/" ++ tagPath ++ "/.gophermap"
 
-  allTags :: [T.Text]
-  allTags = HashMap.keys tagIndex
+    -- write out the main tag index
+    createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
+    writeFile mainTagIndexPath (makeMainTagIndex tagPath)
 
-  -- | Write the index of tag indexes! This makes it so the user can see all the tags and
-  -- see five example posts (should make this sorted by date...) should include instead of
-  -- filepath include a bunch of data necessary for building the indexes.
-  makeMainTagIndex :: FilePath -> String
-  makeMainTagIndex tagIndexDirectory =
-    -- fromjust is bad
-    -- FIXME: this kleisli function is a hack because no fm was included in tag index at the moment
-    let viewAllPostsEntry tag = show $ MenuLink "1" ("View all posts tagged " ++ (T.unpack tag)) (tagIndexDirectory ++ (T.unpack tag)) Nothing Nothing
-        threeSummary tag = intercalate "\n"
-          [ (T.unpack tag)
-          , (intercalate "\n" $ map (makeLocalLink . (id &&& const Nothing)) $ take 3 (fromJust $ HashMap.lookup tag tagIndex))
-          , viewAllPostsEntry tag
-          ]
-    in intercalate "\n\n" $ map threeSummary allTags
+    traverse_ (writeTagIndexF configParser) allTags
+   where
+    writeTagIndexF :: ConfigParser -> T.Text -> IO ()
+    writeTagIndexF configParser tag = do
+      tagIndexPath <- getConfigValue configParser "phlog" "tagPath"
+      buildPath <- getConfigValue configParser "general" "buildPath"
+      let outputPath = buildPath ++ "/" ++ tagIndexPath ++ "/" ++ (T.unpack tag) ++ "/.gophermap"
+          outputDirectoryPath = takeDirectory outputPath
+      createDirectoryIfMissing True outputDirectoryPath
+      writeFile outputPath (tagIndexContents tag)
 
-  tagIndexContents :: T.Text -> String
-  tagIndexContents tag =
-    -- fromjust bad! FIXME
-    (T.unpack tag) ++ "\n\n" ++ (intercalate "\n" $ map (makeLocalLink . (id &&& const Nothing)) $ fromJust $ HashMap.lookup tag tagIndex)
+    allTags :: [T.Text]
+    allTags = HashMap.keys specificTagIndex
+
+    -- | Write the index of tag indexes! This makes it so the user can see all the tags and
+    -- see five example posts (should make this sorted by date...) should include instead of
+    -- filepath include a bunch of data necessary for building the indexes.
+    makeMainTagIndex :: FilePath -> String
+    makeMainTagIndex tagIndexDirectory =
+      -- fromjust is bad
+      -- FIXME: this kleisli function is a hack because no fm was included in tag index at the moment
+      let viewAllPostsEntry tag = show $ MenuLink "1" ("View all posts tagged " ++ (T.unpack tag)) (tagIndexDirectory ++ (T.unpack tag)) Nothing Nothing
+          threeSummary tag = intercalate "\n"
+            [ (T.unpack tag)
+            , (intercalate "\n" $ map (makeLocalLink . (id &&& const Nothing)) $ take 3 (fromJust $ HashMap.lookup tag specificTagIndex))
+            , viewAllPostsEntry tag
+            ]
+      in intercalate "\n\n" $ map threeSummary allTags
+
+    tagIndexContents :: T.Text -> String
+    tagIndexContents tag =
+      -- fromjust bad! FIXME
+      (T.unpack tag) ++ "\n\n" ++ (intercalate "\n" $ map (makeLocalLink . (id &&& const Nothing)) $ fromJust $ HashMap.lookup tag specificTagIndex)
+
 
 -- | Render the tag indexes from a collection of file paths and their
 -- associated `FrontMatter`, which contains the tags for that file.
@@ -147,14 +157,22 @@ writeTagIndex tagIndex = do
 -- The tags are written out to the supplied `FilePath`.
 renderTagIndexes :: PostPageMeta ->  IO ()
 renderTagIndexes filePathFrontMatter = do
-  let tagIndex = makeTagIndex filePathFrontMatter
-  writeTagIndex tagIndex
+  let specificTagIndex = createIndex filePathFrontMatter :: SpecificTagIndex
+  writeIndex specificTagIndex
 
 
 -- TODO: this should be plural... maybe it should be [PostPageMeta]
 -- TODO: better names? filefrontmatterpairs?
 -- | Pairs of filepaths associated with their frontmatter. Useful for posts and pages.
 type PostPageMeta = [(FilePath, Maybe FrontMatter)]
+
+{-
+-- could have [(FIlePath, Maybe FrontMatter)] have many types/type synonyms?
+-- like AllTagsIndex and SpecificTagIndex
+class PhlogIndex a where
+  writeIndex :: String
+  writeIndex .. = ...
+-}
 
 
 dateStringToEpoch :: Integer -> T.Text -> DP.DateTime
@@ -222,7 +240,7 @@ instance Show MenuLink where
 --  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
 -- FIXME: directories need to be defined in config
 -- | Create the main phlog index which includes all the posts sorted by date.
-renderPhlogIndex :: [(FilePath, Maybe FrontMatter)] -> IO ()
+renderPhlogIndex :: PostPageMeta -> IO ()
 renderPhlogIndex fileFrontMatterPairs = do
   currentYear <- (\(y,_,_) -> y) <$> (getCurrentTime >>= return . toGregorian . utctDay) 
   configParser <- getConfig
