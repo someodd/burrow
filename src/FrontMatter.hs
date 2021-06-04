@@ -11,8 +11,9 @@
 --
 -- ...
 {-# LANGUAGE OverloadedStrings          #-}
-module FrontMatter (renderPhlogIndex, renderTagIndexes, getFrontMatter, FrontMatter) where
+module FrontMatter (renderMainPhlogIndex, renderTagIndexes, getFrontMatter, FrontMatter) where
 
+import Control.Monad.Reader
 import Control.Arrow ((&&&))
 import Data.Time.Calendar
 import Data.Time.Clock
@@ -77,14 +78,67 @@ getFrontMatter _ text = do
       Fail _ _ _ -> (Nothing, text)
 
 
-
 class PhlogIndex a where
   -- can derive these
   --createIndex :: PostPageMeta -> a
   --createRSS :: PostPageMeta -> String?
   -- writeRSS :: a -> IO ()
+
+  -- | Create the data model...
   createIndex :: PostPageMeta -> a
+
+  -- | Do all the work required to write a string of the data model to file...
   writeIndex :: a -> IO ()
+
+
+-- The Int is the current year
+newtype MainPhlogIndex = MainPhlogIndex (Reader Integer PostPageMeta)
+
+instance PhlogIndex MainPhlogIndex where
+  createIndex postPageMetaPairs = do
+    MainPhlogIndex $ do
+      currentYear <- ask
+      pure $ makePhlogIndex postPageMetaPairs currentYear
+   where
+    -- TODO: actually parse into a nice thing
+    -- | An index (gophermap) of all the phlog posts! Just sorts all the
+    -- filepath/frontmatter pairs.
+    makePhlogIndex :: PostPageMeta -> Integer -> PostPageMeta
+    makePhlogIndex meta defaultYear =
+      sortOn (\y -> snd y >>= \fm -> dateStringToEpoch defaultYear <$> date fm) meta
+
+  writeIndex (MainPhlogIndex mainPhlogIndex) = do
+    -- TODO: list main tag index
+    -- TODO: 
+    --  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
+    -- FIXME: directories need to be defined in config
+    -- | Create the main phlog index which includes all the posts sorted by date.
+    currentYear <- getCurrentYear
+    configParser <- getConfig
+    buildPath <- getConfigValue configParser "general" "buildPath"
+    phlogPath <- getConfigValue configParser "phlog" "phlogPath"
+    tagPath <- getConfigValue configParser "phlog" "tagPath"
+    let outputPath = buildPath ++ "/" ++ phlogPath ++ "/.gophermap"
+        phlogIndex = runReader mainPhlogIndex currentYear
+    writeFile outputPath $ makePhlogIndexPage phlogIndex tagPath
+   where
+    makePhlogIndexPage :: PostPageMeta -> FilePath -> String
+    makePhlogIndexPage meta tagIndexPath =
+      let viewByTagsEntry = show $ MenuLink "1" "view by tags" tagIndexPath Nothing Nothing
+          allThePosts = "all phlog posts\n" ++ (intercalate "\n" $ map (makeLocalLink) meta)
+      in viewByTagsEntry ++ "\n" ++ allThePosts
+
+
+renderMainPhlogIndex :: PostPageMeta -> IO ()
+renderMainPhlogIndex postPageMetaPairs = do
+  let mainPhlogIndex = createIndex postPageMetaPairs :: MainPhlogIndex
+  writeIndex mainPhlogIndex
+
+
+-- | This is for the default date while interpreting FrontMatter dates.
+getCurrentYear :: IO Integer
+getCurrentYear = (\(y,_,_) -> y) <$> (getCurrentTime >>= return . toGregorian . utctDay) 
+
 
 newtype SpecificTagIndex = SpecificTagIndex (HashMap.HashMap T.Text [FilePath])
 
@@ -179,14 +233,6 @@ dateStringToEpoch :: Integer -> T.Text -> DP.DateTime
 dateStringToEpoch defaultYear dateText = head $ DP.extractDateTimesY (fromIntegral defaultYear :: Int) (T.unpack dateText)
 
 
--- TODO: actually parse into a nice thing
--- | An index (gophermap) of all the phlog posts! Just sorts all the
--- filepath/frontmatter pairs.
-makePhlogIndex :: PostPageMeta -> Integer -> PostPageMeta
-makePhlogIndex meta defaultYear =
-  sortOn (\y -> snd y >>= \fm -> dateStringToEpoch defaultYear <$> date fm) meta
-
-
 -- | A useful tool in making phlog indexes: create a nice link for the menu
 -- using a supplied pair from PostPageMeta.
 makeLocalLink :: (FilePath, Maybe FrontMatter) -> String
@@ -203,12 +249,6 @@ makeLocalLink (path, maybeFrontMatter)
   label :: String
   label = fromMaybe path (maybeFrontMatter >>= \fm -> T.unpack <$> title fm)
 
-
-makePhlogIndexPage :: PostPageMeta -> FilePath -> String
-makePhlogIndexPage meta tagIndexPath =
-  let viewByTagsEntry = show $ MenuLink "1" "view by tags" tagIndexPath Nothing Nothing
-      allThePosts = "all phlog posts\n" ++ (intercalate "\n" $ map (makeLocalLink) meta)
-  in viewByTagsEntry ++ "\n" ++ allThePosts
 
 
 data MenuLink = MenuLink
@@ -228,25 +268,11 @@ instance Show MenuLink where
     let firstPart =
           intercalate "\t"
             [ (linkType ml) ++ (displayString ml)
-            , selector ml
+            , "/" ++ (selector ml)
             ]
         secondPart =
           fromMaybe "" (server ml >>= \x -> port ml >>= \y -> Just $ "\t" ++ x ++ "\t" ++ (show y))
     in firstPart ++ secondPart
 
 
--- TODO: list main tag index
--- TODO: 
---  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
--- FIXME: directories need to be defined in config
--- | Create the main phlog index which includes all the posts sorted by date.
-renderPhlogIndex :: PostPageMeta -> IO ()
-renderPhlogIndex fileFrontMatterPairs = do
-  currentYear <- (\(y,_,_) -> y) <$> (getCurrentTime >>= return . toGregorian . utctDay) 
-  configParser <- getConfig
-  buildPath <- getConfigValue configParser "general" "buildPath"
-  phlogPath <- getConfigValue configParser "phlog" "phlogPath"
-  tagPath <- getConfigValue configParser "phlog" "tagPath"
-  let outputPath = buildPath ++ "/" ++ phlogPath ++ "/.gophermap"
-      phlogIndex = makePhlogIndex fileFrontMatterPairs currentYear
-  writeFile outputPath $ makePhlogIndexPage phlogIndex tagPath
+
