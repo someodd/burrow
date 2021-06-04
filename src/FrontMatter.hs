@@ -79,7 +79,7 @@ getFrontMatter _ text = do
 
 type TagIndex = HashMap.HashMap T.Text [FilePath]
 
-makeTagIndex :: [(FilePath, Maybe FrontMatter)] -> TagIndex
+makeTagIndex :: PostPageMeta -> TagIndex
 makeTagIndex pairs =
   HashMap.fromListWith (++) $ sorted
  where
@@ -144,7 +144,7 @@ writeTagIndex tagIndex = do
 -- associated `FrontMatter`, which contains the tags for that file.
 --
 -- The tags are written out to the supplied `FilePath`.
-renderTagIndexes :: [(FilePath, Maybe FrontMatter)] ->  IO ()
+renderTagIndexes :: PostPageMeta ->  IO ()
 renderTagIndexes filePathFrontMatter = do
   let tagIndex = makeTagIndex filePathFrontMatter
   writeTagIndex tagIndex
