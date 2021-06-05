@@ -102,6 +102,7 @@ type Tag = T.Text
 -- in the future also should look more like a hashmap of tag to [(filepath, frontmatter)]
 -- in fact passing the sorted tag index could be something handy to have as reader in both instances
 -- for efficiency
+--newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [(FilePath, FrontMatter)])
 newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [FilePath])
 
 -- FIXME/TODO
@@ -153,7 +154,7 @@ instance PhlogIndex MainTagIndex where
       in intercalate "\n\n" $ map threeSummary allTags
 
 
-newtype SpecificTagIndexes = SpecificTagIndexes (HashMap.HashMap T.Text [FilePath])
+newtype SpecificTagIndexes = SpecificTagIndexes (HashMap.HashMap Tag [(FilePath, FrontMatter)])
 
 -- FIXME, TODO: break down into specific tag indexes? but if you do that you'll have to accept the tag as an argument as reader or something?
 -- FIXME: but you just want to reference a specific tag? or is this going to handle literally ALL of the individual tag indexes? rename to SpecificTagIndexes
@@ -162,14 +163,13 @@ newtype SpecificTagIndexes = SpecificTagIndexes (HashMap.HashMap T.Text [FilePat
 -- | The tag indexes for each tag (many files).
 instance PhlogIndex SpecificTagIndexes where
   createIndexModel postPageMetaPairs =
-    SpecificTagIndexes $ HashMap.fromListWith (++) sorted
+    SpecificTagIndexes $ HashMap.fromListWith (++) result
    where
-    unsorted :: [(Tag, [(FilePath, Maybe T.Text)])]
-    unsorted = [(tag, [(filePath, date fm)]) | (filePath, Just fm) <- postPageMetaPairs, tag <- tags fm]
-
-    -- needs to be sorted by date, descending
-    sorted :: [(Tag, [FilePath])]
-    sorted = map (\(tag, fileDateList) -> (tag, map fst $ sortOn snd fileDateList)) unsorted
+    result :: [ (Tag, [(FilePath, FrontMatter)]) ]
+    result =
+      let defaultYear = 2021-- FIXME
+          sorted = sortOn (\y -> snd y >>= \fm -> dateStringToDateTime defaultYear <$> date fm) postPageMetaPairs
+      in [(tag, [(filePath, fm)]) | (filePath, Just fm) <- sorted, tag <- tags fm]-- FIXME: what if no tags? that should error right and be just fine?
 
   renderIndexGophermap (SpecificTagIndexes specificTagIndexes) = do
     configParser <- getConfig
@@ -190,7 +190,7 @@ instance PhlogIndex SpecificTagIndexes where
     tagIndexContents :: T.Text -> String
     tagIndexContents tag =
       -- fromjust bad! FIXME
-      (T.unpack tag) ++ "\n\n" ++ (intercalate "\n" $ map (makeLocalLink . (id &&& const Nothing)) $ fromJust $ HashMap.lookup tag specificTagIndexes)
+      (T.unpack tag) ++ "\n\n" ++ (intercalate "\n" $ map (makeLocalLink . (fst &&& Just . snd)) $ fromJust $ HashMap.lookup tag specificTagIndexes)
 
 
 -- | Render the tag indexes from a collection of file paths and their
