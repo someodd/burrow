@@ -46,7 +46,7 @@ import qualified Text.Mustache.Types as Mtype
 
 import Control.Monad.Reader
 
-import FrontMatter
+import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter, getFrontMatter)
 import TextUtils.Headings
 import Markdown
 import Mustache
