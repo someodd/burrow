@@ -102,26 +102,26 @@ type Tag = T.Text
 -- in the future also should look more like a hashmap of tag to [(filepath, frontmatter)]
 -- in fact passing the sorted tag index could be something handy to have as reader in both instances
 -- for efficiency
---newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [(FilePath, FrontMatter)])
-newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [FilePath])
+newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [(FilePath, FrontMatter)])
 
+-- FIXME/TODO: there's a TON of overlap between this and the other tag indexes so write some helper functions
 -- FIXME/TODO
 -- | The phlog index which lists all the tags and the latest posts for each tag.
 instance PhlogIndex MainTagIndex where
   -- NOTE: due to PhlogIndex SpecificTagIndex being similar, this results in much overlap/recalculation...
   createIndexModel postPageMetaPairs =
-    MainTagIndex $ HashMap.fromListWith (++) $ sorted
+    MainTagIndex $ HashMap.map (take postsPerTag) $ HashMap.fromListWith (++) result
    where
     -- TODO/FIXME: make into config value... will have to use reader?
     postsPerTag :: Int
     postsPerTag = 3
 
-    unsorted :: [(Tag, [(FilePath, Maybe T.Text)])]
-    unsorted = [(tag, [(filePath, date fm)]) | (filePath, Just fm) <- postPageMetaPairs, tag <- tags fm]
-
-    -- needs to be sorted by date, descending
-    sorted :: [(Tag, [FilePath])]
-    sorted = map (\(tag, fileDateList) -> (tag, map fst $ sortOn snd fileDateList)) $ map (id . fst &&& take postsPerTag . snd) unsorted
+    result :: [ (Tag, [(FilePath, FrontMatter)]) ]
+    result =
+      let defaultYear = 2021-- FIXME
+          sorted = sortOn (\y -> snd y >>= \fm -> dateStringToDateTime defaultYear <$> date fm) postPageMetaPairs
+      -- FIXME: this won't work here! (take)
+      in [(tag, take postsPerTag [(filePath, fm)]) | (filePath, Just fm) <- sorted, tag <- tags fm]-- FIXME: what if no tags? that should error right and be just fine?
 
   renderIndexGophermap (MainTagIndex mainTagIndex) = do
     -- get paths from config
@@ -148,7 +148,7 @@ instance PhlogIndex MainTagIndex where
           threeSummary tag = intercalate "\n"
             [ (T.unpack tag)
             -- FIXME: use of fromJust here is bad.
-            , intercalate "\n" $ map (makeLocalLink . (id &&& const Nothing)) $ take 3 (fromJust $ HashMap.lookup tag mainTagIndex)
+            , intercalate "\n" $ map makeLocalLink $ map (\(x,y) -> (x, Just y)) $ fromJust $ HashMap.lookup tag mainTagIndex
             , viewAllPostsEntry tag
             ]
       in intercalate "\n\n" $ map threeSummary allTags
