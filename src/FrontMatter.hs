@@ -28,7 +28,7 @@ import qualified Data.HashMap.Strict as HashMap
 import Data.Attoparsec.ByteString ((<?>))
 import qualified Data.ByteString as ByteString
 import Data.Frontmatter (Parser, IResult(..), frontmatter, parse)
-import Data.Yaml (FromJSON, parseJSON, withObject, (.:?), (.:), decodeEither')
+import Data.Yaml (ParseException, FromJSON, parseJSON, withObject, (.:?), (.:), decodeEither')
 import Data.Text.Encoding         as T
 import qualified Data.Text as T
 import Data.List (sortOn, intercalate, isSuffixOf)
@@ -44,21 +44,26 @@ data FrontMatter = FrontMatter
   , title :: Maybe T.Text
   } deriving (Show)
 
--- TODO: better document... where does this come into play?
+-- | Allows for the decoding of ByteString into the `FrontMatter` type.
 instance FromJSON FrontMatter where
   parseJSON = withObject "FrontMatter" $ \o -> FrontMatter <$> o .: "tags" <*> o .:? "date" <*> o .:? "title"
 
--- TODO: docs, I don't know what's happening here. i have to refresh myself.
--- | The parser to be used by `parse`.
+-- | The parser to be used by `parse`. Works with `FrontMatter`'s `FromJSON`
+-- instance through type inference.
 frontmatterBurrow :: Parser FrontMatter
 frontmatterBurrow = frontmatterYaml' <?> "frontmatterBurrow"
-  where
-    frontmatterYaml' = do
-        f <- frontmatter
-        case decodeEither' f of
-            Left e -> error (show e)
-            --Left e -> fail (show e)
-            Right v -> return v
+ where
+  frontmatterYaml' = do
+    -- We put ourselves into the Parser monad.
+    parserByteString <- frontmatter :: Parser ByteString.ByteString
+    -- This is where the magic happens. Decodes the `ByteString` using the
+    -- `FromJSON` instance of the `FrontMatter` type because of the type singatures
+    -- we supplied for this function.
+    case (decodeEither' (parserByteString :: ByteString.ByteString) :: Either ParseException FrontMatter) of
+      Left parseException -> error . show $ (parseException :: ParseException)
+      -- We leave the Parser monad by ending with a Parser FrontMatter, since
+      -- decodeEither' will use the parseJSON method for `FrontMatter`.
+      Right frontMatter -> return frontMatter:: Parser FrontMatter
 
 -- TODO, FIXME: comments, docs
 -- | Get the `FrontMatter` from text contents, if there is any frontmatter present.
