@@ -111,6 +111,7 @@ library
     Build
     Config
     FrontMatter
+    Phlog
     Common
 
   -- Modules included in this library but not exported.
