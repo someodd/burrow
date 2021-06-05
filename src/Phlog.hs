@@ -36,7 +36,7 @@ class PhlogIndex a where
   -- writeRSS :: a -> IO ()
 
   -- | Create the data model of the phlog index in question.
-  createIndex :: PostPageMeta -> a
+  createIndexModel :: PostPageMeta -> a
 
   -- NOTE: isn't this sloppy? It does all the work of transforming the data.
   -- Weird set of responsibilities.
@@ -50,7 +50,7 @@ class PhlogIndex a where
 newtype MainPhlogIndex = MainPhlogIndex (Reader Integer PostPageMeta)
 
 instance PhlogIndex MainPhlogIndex where
-  createIndex postPageMetaPairs = do
+  createIndexModel postPageMetaPairs = do
     MainPhlogIndex $ do
       currentYear <- ask
       pure $ makePhlogIndex postPageMetaPairs currentYear
@@ -86,7 +86,7 @@ instance PhlogIndex MainPhlogIndex where
 
 renderMainPhlogIndex :: PostPageMeta -> IO ()
 renderMainPhlogIndex postPageMetaPairs = do
-  let mainPhlogIndex = createIndex postPageMetaPairs :: MainPhlogIndex
+  let mainPhlogIndex = createIndexModel postPageMetaPairs :: MainPhlogIndex
   renderIndexGophermap mainPhlogIndex
 
 
@@ -108,15 +108,13 @@ newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [FilePath])
 -- | The phlog index which lists all the tags and the latest posts for each tag.
 instance PhlogIndex MainTagIndex where
   -- NOTE: due to PhlogIndex SpecificTagIndex being similar, this results in much overlap/recalculation...
-  createIndex postPageMetaPairs =
+  createIndexModel postPageMetaPairs =
     MainTagIndex $ HashMap.fromListWith (++) $ sorted
    where
     -- TODO/FIXME: make into config value... will have to use reader?
     postsPerTag :: Int
     postsPerTag = 3
 
-    -- FIXME: only grab the n latest per tag, if possible. Not sure if that shold be done here or in sorted. Probably in sorted since postpagemetapairs are unsorted and repeat.
-    -- could just filter before sorting...
     unsorted :: [(Tag, [(FilePath, Maybe T.Text)])]
     unsorted = [(tag, [(filePath, date fm)]) | (filePath, Just fm) <- postPageMetaPairs, tag <- tags fm]
 
@@ -163,7 +161,7 @@ newtype SpecificTagIndexes = SpecificTagIndexes (HashMap.HashMap T.Text [FilePat
 -- the individual tag indexes!
 -- | The tag indexes for each tag (many files).
 instance PhlogIndex SpecificTagIndexes where
-  createIndex postPageMetaPairs =
+  createIndexModel postPageMetaPairs =
     SpecificTagIndexes $ HashMap.fromListWith (++) sorted
    where
     unsorted :: [(Tag, [(FilePath, Maybe T.Text)])]
@@ -201,9 +199,9 @@ instance PhlogIndex SpecificTagIndexes where
 -- The tags are written out to the supplied `FilePath`.
 renderTagIndexes :: PostPageMeta ->  IO ()
 renderTagIndexes filePathFrontMatter = do
-  let specificTagIndexes = createIndex filePathFrontMatter :: SpecificTagIndexes
+  let specificTagIndexes = createIndexModel filePathFrontMatter :: SpecificTagIndexes
   renderIndexGophermap specificTagIndexes
-  let mainTagIndex = createIndex filePathFrontMatter :: MainTagIndex
+  let mainTagIndex = createIndexModel filePathFrontMatter :: MainTagIndex
   renderIndexGophermap mainTagIndex
 
 
