@@ -35,13 +35,15 @@ class PhlogIndex a where
   --createRSS :: PostPageMeta -> String?
   -- writeRSS :: a -> IO ()
 
-  -- | Create the data model...
+  -- | Create the data model of the phlog index in question.
   createIndex :: PostPageMeta -> a
 
-  -- NOTE: isn't this sloppy? It does all the work of transforming the data
-  -- model into a string and then writes it? Weird set of responsibilities.
-  -- | Do all the work required to write a string of the data model to file...
-  writeIndex :: a -> IO ()
+  -- NOTE: isn't this sloppy? It does all the work of transforming the data.
+  -- Weird set of responsibilities.
+  -- | Render the phlog index model file in order to be viewed as a gophermap
+  -- in gopherspace.  This includes creating the string/file contents from the
+  -- supplied model, which is then written to file.
+  renderIndexGophermap :: a -> IO ()
 
 
 -- The Int is the current year
@@ -60,7 +62,7 @@ instance PhlogIndex MainPhlogIndex where
     makePhlogIndex meta defaultYear =
       sortOn (\y -> snd y >>= \fm -> dateStringToDateTime defaultYear <$> date fm) meta
 
-  writeIndex (MainPhlogIndex mainPhlogIndex) = do
+  renderIndexGophermap (MainPhlogIndex mainPhlogIndex) = do
     -- TODO: list main tag index
     -- TODO: 
     --  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
@@ -85,7 +87,7 @@ instance PhlogIndex MainPhlogIndex where
 renderMainPhlogIndex :: PostPageMeta -> IO ()
 renderMainPhlogIndex postPageMetaPairs = do
   let mainPhlogIndex = createIndex postPageMetaPairs :: MainPhlogIndex
-  writeIndex mainPhlogIndex
+  renderIndexGophermap mainPhlogIndex
 
 
 -- | This is for the default date while interpreting FrontMatter dates.
@@ -98,6 +100,8 @@ type Tag = T.Text
 
 -- FIXME TODO
 -- in the future also should look more like a hashmap of tag to [(filepath, frontmatter)]
+-- in fact passing the sorted tag index could be something handy to have as reader in both instances
+-- for efficiency
 newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [FilePath])
 
 -- FIXME/TODO
@@ -120,7 +124,7 @@ instance PhlogIndex MainTagIndex where
     sorted :: [(Tag, [FilePath])]
     sorted = map (\(tag, fileDateList) -> (tag, map fst $ sortOn snd fileDateList)) $ map (id . fst &&& take postsPerTag . snd) unsorted
 
-  writeIndex (MainTagIndex mainTagIndex) = do
+  renderIndexGophermap (MainTagIndex mainTagIndex) = do
     -- get paths from config
     configParser <- getConfig
     buildPath <- getConfigValue configParser "general" "buildPath"
@@ -169,14 +173,7 @@ instance PhlogIndex SpecificTagIndexes where
     sorted :: [(Tag, [FilePath])]
     sorted = map (\(tag, fileDateList) -> (tag, map fst $ sortOn snd fileDateList)) unsorted
 
-  -- FIXME: wayyyyy too big and complicated!!!
-  writeIndex (SpecificTagIndexes specificTagIndexes) = do
-    -- FIXME: tag index needs to use frontmatter again not just paths?
-    -- TODO/FIXME: it's called write but it's really doing heavy lifting for parsing list into files?
-    -- TODO: sort by pubdate?
-    -- FIXME: TagIndex should be more robust and not just store the file path but more info as well. maybe frontmatter should be modified to include the filepath! although it could just include more metadata like pubdate etc etc to make it more useful...
-    -- | Write out tag indexes to a directory...
-    -- get paths from config
+  renderIndexGophermap (SpecificTagIndexes specificTagIndexes) = do
     configParser <- getConfig
     traverse_ (writeTagIndexF configParser) allTags
    where
@@ -205,9 +202,9 @@ instance PhlogIndex SpecificTagIndexes where
 renderTagIndexes :: PostPageMeta ->  IO ()
 renderTagIndexes filePathFrontMatter = do
   let specificTagIndexes = createIndex filePathFrontMatter :: SpecificTagIndexes
-  writeIndex specificTagIndexes
+  renderIndexGophermap specificTagIndexes
   let mainTagIndex = createIndex filePathFrontMatter :: MainTagIndex
-  writeIndex mainTagIndex
+  renderIndexGophermap mainTagIndex
 
 
 -- TODO: this should be plural... maybe it should be [PostPageMeta]
