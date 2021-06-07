@@ -2,25 +2,28 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE AllowAmbiguousTypes        #-}
+{-# LANGUAGE FlexibleInstances          #-}
 module Phlog
   (
-  -- * A type used for producing the models necesary for phlog indexes.
-    PostPageMeta(..)
   -- * Produce different kinds of indexes for the phlog.
   -- $phlogIndexes
-  , renderMainPhlogIndex
+    renderMainPhlogIndex
   , renderTagIndexes
+  , PostPageMeta(..)
   -- * Re-exports to make handling phlogs easier.
   , FrontMatter
   , getFrontMatter
   ) where
 
+--import Data.Functor.Identity (Identity(..))
+import Data.Foldable (toList)
+import Data.Hashable (Hashable)
 import Data.Time.Calendar (toGregorian)
 import Data.Time.Clock (getCurrentTime, utctDay)
 import qualified Data.Dates.Parsing as DP
 import System.FilePath (takeDirectory)
 import System.Directory (createDirectoryIfMissing)
---import Data.Foldable (traverse_)
+import Data.Foldable (traverse_)
 import Data.Maybe (fromMaybe, fromJust)
 import qualified Data.HashMap.Strict as HashMap
 import Control.Arrow ((&&&))
@@ -35,6 +38,9 @@ import FrontMatter (FrontMatter(..), getFrontMatter)
 
 -- | Represents different kinds of phlog indexes and the tools required to do
 -- things with them.
+--
+-- Type `a` is what will create the model (type `b`) used in creating the
+-- gophermap as well as the Atom feed.
 class PhlogIndex a b | b -> a where
   -- can derive these
   --createRSS :: PostPageMeta -> String?
@@ -160,11 +166,12 @@ instance PhlogIndex PostPageMeta MainTagIndex where
 
 
 -- this one could be more general like PostPageMetaCriterion for cats and authors etc
-newtype PostPageMetaTag = PostPageMetaTag (Tag, PostPageMeta)
+--newtype PostPageMetaTag = PostPageMetaTag (Tag, PostPageMeta)
 newtype SpecificTagIndex = SpecificTagIndex (Tag, [ (FilePath, FrontMatter) ] )
 
-instance PhlogIndex PostPageMetaTag SpecificTagIndex where
-  createIndexModel (PostPageMetaTag (tag, PostPageMeta postPageMetaPairs)) =
+--newtype PostPageMetaGroupPair a = PostPageMetaGroupPair (String, a, [(FilePath, FrontMatter)] -- this is what get accepted by the thingy builder
+instance PhlogIndex (PostPageMetaGroupPair Tag) SpecificTagIndex where
+  createIndexModel (PostPageMetaGroupPair (_, tag, postPageMetaPairs)) =
     --SpecificTagIndex $ (tag, head $ HashMap.toList $ HashMap.fromListWith (++) (result defaultYear tag))
     -- FIXME
     SpecificTagIndex $ (tag, snd . head $ HashMap.toList $ HashMap.fromListWith (++) (result defaultYear tag))
@@ -176,9 +183,8 @@ instance PhlogIndex PostPageMetaTag SpecificTagIndex where
     -- FIXME: no need for second argument tag
     result :: Integer -> Tag -> [ (Tag, [(FilePath, FrontMatter)]) ]
     result year _ =
-      let filteredByTag = filter (\b -> fromMaybe False (snd b >>= \fm -> pure $ tag `elem` tags fm) ) postPageMetaPairs
-          sorted = sortOn (\y -> snd y >>= \fm -> dateStringToDateTime year <$> date fm) filteredByTag
-      in [(tag, [(filePath, fm)]) | (filePath, Just fm) <- sorted]-- FIXME: what if no tags? that should error right and be just fine?
+      let sorted = sortOn (\y -> date (snd y) >>= pure . dateStringToDateTime year) postPageMetaPairs
+      in [(tag, [(filePath, fm)]) | (filePath, fm) <- sorted]-- FIXME: what if no tags? that should error right and be just fine?
 
   renderIndexGophermap (SpecificTagIndex (tag, specificTagIndexes)) = do
     configParser <- getConfig
@@ -202,6 +208,38 @@ instance PhlogIndex PostPageMetaTag SpecificTagIndex where
       (T.unpack tag) ++ "\n\n" ++ (intercalate "\n" $ map (makeLocalLink . (fst &&& Just . snd)) $ specificTagIndexes)
 
 
+newtype PostPageMetaGroupPair a = PostPageMetaGroupPair (String, a, [(FilePath, FrontMatter)]) -- this is what get accepted by the thingy builder
+newtype PostPageMetaGroup a = PostPageMetaGroup (String, HashMap.HashMap a [(FilePath, FrontMatter)]) deriving (Show)
+
+
+getPostPageMetaGroupPair :: (Eq a, Hashable a) => PostPageMetaGroup a -> a -> PostPageMetaGroupPair a
+getPostPageMetaGroupPair (PostPageMetaGroup (label, hashMap)) key =
+  -- FIXME: fromjust
+  PostPageMetaGroupPair (label, key, fromJust $ HashMap.lookup key hashMap)
+
+-- | Group posts together by some property of the FrontMatter. Weeds out posts
+-- without FrontMatter.
+--
+-- If you're not getting a value that is a list you can use Identity as the return
+-- value. 
+--
+--
+-- >>> (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("title", Identity . title) :: (String, HashMap.HashMap (Maybe T.Text) [(FilePath, FrontMatter)]))
+-- >>> (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("tag", tags) :: (String, HashMap.HashMap Tag [(FilePath, FrontMatter)]))
+frontMatterHashMapGroup
+  :: (Eq a, Hashable a, Foldable f)
+  => PostPageMeta
+  -> (String, FrontMatter -> f a)
+  -> PostPageMetaGroup a
+frontMatterHashMapGroup (PostPageMeta postPageMetaPairs) (groupName, groupFunction) =
+  PostPageMetaGroup $ (groupName, HashMap.fromListWith (++) result)
+ where
+  result =
+    [ (group, [(filePath, fm)]) | (filePath, Just fm) <- postPageMetaPairs, group <- (toList $ groupFunction fm)]
+
+-- FIXME: define Post as (FilePath, Maybe FrontMatter)?
+
+-- FIXME: should i have a function that will create a separation of all the tags into their respective groups so it generates efficiently? this could also be used by the main tag index
 -- FIXME: need to get all tags and then traverse or something
 -- | Render the tag indexes from a collection of file paths and their
 -- associated `FrontMatter`, which contains the tags for that file.
@@ -210,8 +248,13 @@ instance PhlogIndex PostPageMetaTag SpecificTagIndex where
 renderTagIndexes :: [(FilePath, Maybe FrontMatter)] ->  IO ()
 renderTagIndexes filePathFrontMatter = do
   -- FIXME: currently only doing tag "foo"
-  let specificTagIndex = createIndexModel (PostPageMetaTag ("foo", PostPageMeta filePathFrontMatter)) :: SpecificTagIndex
-  renderIndexGophermap specificTagIndex
+  --_ <- error . show $ (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("title", Identity . title) :: PostPageMetaGroup (Maybe T.Text))
+  --_ <- error . show $ (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("tag", tags) :: PostPageMetaGroup Tag)
+
+  let ppmg@(PostPageMetaGroup (_, hashMap)) = (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("tag", tags) :: PostPageMetaGroup Tag)
+      tagsFound = HashMap.keys hashMap
+  traverse_ (\x -> renderIndexGophermap (createIndexModel $ getPostPageMetaGroupPair ppmg x :: SpecificTagIndex)) tagsFound
+
   let mainTagIndex = createIndexModel (PostPageMeta filePathFrontMatter) :: MainTagIndex
   renderIndexGophermap mainTagIndex
 
