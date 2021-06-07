@@ -74,6 +74,7 @@ common shared-properties
     attoparsec,
     vector,
     time,
+    hashable,
     fuzzy-dates,
     yaml
 
