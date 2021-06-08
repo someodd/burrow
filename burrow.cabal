@@ -55,7 +55,10 @@ common shared-properties
   build-depends:
     base                 >=4.7 && <5,
     text,
+    xml-conduit-writer,
     parsec,
+    data-default,
+    xml-conduit,
     word-wrap,
     table-layout         ^>=0.9,
     split,
@@ -76,6 +79,7 @@ common shared-properties
     time,
     hashable,
     fuzzy-dates,
+    hourglass,
     yaml
 
   -- LANGUAGE extensions used by modules in this package.
