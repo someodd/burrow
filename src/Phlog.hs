@@ -31,7 +31,7 @@ import Control.Monad.Reader (runReader, Reader, ask)
 import Data.List (sortOn, intercalate, isSuffixOf)
 import qualified Data.Text as T
 
-import Config (getConfig, getConfigValue, ConfigParser)
+import Config (getConfig, getConfigValue)
 import Common (gophermapSuffix, textFileSuffix)
 import FrontMatter (FrontMatter(..), getFrontMatter)
 
@@ -42,15 +42,16 @@ import FrontMatter (FrontMatter(..), getFrontMatter)
 -- Type `a` is what will create the model (type `b`) used in creating the
 -- gophermap as well as the Atom feed.
 class PhlogIndex a b | b -> a where
-  -- can derive these
-  --createRSS :: PostPageMeta -> String?
-  -- writeRSS :: a -> IO ()
+  -- TODO: renderAtom :: a -> IO ()
+
+  -- | Sort the index model.
+  sortIndexModel :: b -> b
 
   -- | Create the data model of the phlog index in question.
+  createIndexModel' :: a -> b
   createIndexModel :: a -> b
+  createIndexModel = sortIndexModel . createIndexModel'
 
-  -- NOTE: isn't this sloppy? It does all the work of transforming the data.
-  -- Weird set of responsibilities.
   -- | Render the phlog index model file in order to be viewed as a gophermap
   -- in gopherspace.  This includes creating the string/file contents from the
   -- supplied model, which is then written to file.
@@ -61,9 +62,16 @@ class PhlogIndex a b | b -> a where
 newtype MainPhlogIndex = MainPhlogIndex (Reader Integer PostPageMeta)
 
 instance PhlogIndex PostPageMeta MainPhlogIndex where
-  createIndexModel postPageMetaPairs = do
+  sortIndexModel (MainPhlogIndex readerIntPostPageMeta) = do
+      MainPhlogIndex $ do
+        currentYear <- ask
+        let sorter (PostPageMeta pairs) = PostPageMeta $ sortOn (\y -> snd y >>= \fm -> dateStringToDateTime currentYear <$> date fm) pairs
+        fmap sorter readerIntPostPageMeta
+
+  createIndexModel' postPageMetaPairs = do
     MainPhlogIndex $ do
       currentYear <- ask
+      let 
       pure $ makePhlogIndex postPageMetaPairs currentYear
    where
     -- TODO: actually parse into a nice thing
@@ -119,8 +127,14 @@ newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [(FilePath, FrontMatter
 -- FIXME/TODO
 -- | The phlog index which lists all the tags and the latest posts for each tag.
 instance PhlogIndex PostPageMeta MainTagIndex where
+  -- | Sort the hashmap values by date.
+  sortIndexModel (MainTagIndex mainTagIndexMap) =
+    let defaultYear = 2021
+        sorter = sortOn (\y -> dateStringToDateTime defaultYear <$> date (snd y))
+    in MainTagIndex $ HashMap.map sorter mainTagIndexMap
+
   -- NOTE: due to PhlogIndex SpecificTagIndex being similar, this results in much overlap/recalculation...
-  createIndexModel (PostPageMeta postPageMetaPairs) =
+  createIndexModel' (PostPageMeta postPageMetaPairs) =
     MainTagIndex $ HashMap.map (take postsPerTag) $ HashMap.fromListWith (++) result
    where
     -- TODO/FIXME: make into config value... will have to use reader?
@@ -129,10 +143,7 @@ instance PhlogIndex PostPageMeta MainTagIndex where
 
     result :: [ (Tag, [(FilePath, FrontMatter)]) ]
     result =
-      let defaultYear = 2021-- FIXME
-          sorted = sortOn (\y -> snd y >>= \fm -> dateStringToDateTime defaultYear <$> date fm) postPageMetaPairs
-      -- FIXME: this won't work here! (take)
-      in [(tag, take postsPerTag [(filePath, fm)]) | (filePath, Just fm) <- sorted, tag <- tags fm]-- FIXME: what if no tags? that should error right and be just fine?
+      [(tag, take postsPerTag [(filePath, fm)]) | (filePath, Just fm) <- postPageMetaPairs, tag <- tags fm]-- FIXME: what if no tags? that should error right and be just fine?
 
   renderIndexGophermap (MainTagIndex mainTagIndex) = do
     -- get paths from config
@@ -165,42 +176,30 @@ instance PhlogIndex PostPageMeta MainTagIndex where
       in intercalate "\n\n" $ map threeSummary allTags
 
 
+-- FIXME: this no longer makes sense the way it compiles results.
 -- this one could be more general like PostPageMetaCriterion for cats and authors etc
 --newtype PostPageMetaTag = PostPageMetaTag (Tag, PostPageMeta)
 newtype SpecificTagIndex = SpecificTagIndex (Tag, [ (FilePath, FrontMatter) ] )
 
---newtype PostPageMetaGroupPair a = PostPageMetaGroupPair (String, a, [(FilePath, FrontMatter)] -- this is what get accepted by the thingy builder
 instance PhlogIndex (PostPageMetaGroupPair Tag) SpecificTagIndex where
-  createIndexModel (PostPageMetaGroupPair (_, tag, postPageMetaPairs)) =
-    --SpecificTagIndex $ (tag, head $ HashMap.toList $ HashMap.fromListWith (++) (result defaultYear tag))
-    -- FIXME
-    SpecificTagIndex $ (tag, snd . head $ HashMap.toList $ HashMap.fromListWith (++) (result defaultYear tag))
-   where
-    -- FIXME: Reader
-    defaultYear = 2021
+  sortIndexModel (SpecificTagIndex (tag, filePathFrontMatterPairs)) =
+    let year = 2021
+    in SpecificTagIndex $ (tag, sortOn (\y -> date (snd y) >>= pure . dateStringToDateTime year) filePathFrontMatterPairs)
 
-    -- FIXME: no need for Tag in the result
-    -- FIXME: no need for second argument tag
-    result :: Integer -> Tag -> [ (Tag, [(FilePath, FrontMatter)]) ]
-    result year _ =
-      let sorted = sortOn (\y -> date (snd y) >>= pure . dateStringToDateTime year) postPageMetaPairs
-      in [(tag, [(filePath, fm)]) | (filePath, fm) <- sorted]-- FIXME: what if no tags? that should error right and be just fine?
+  -- FIXME: is all I need to do is sort postPageMetaPairs?
+  createIndexModel' (PostPageMetaGroupPair (_, tag, postPageMetaPairs)) =
+    -- FIXME
+    SpecificTagIndex (tag, postPageMetaPairs)
 
   renderIndexGophermap (SpecificTagIndex (tag, specificTagIndexes)) = do
     configParser <- getConfig
-    writeTagIndexF configParser tag
-    --traverse_ (writeTagIndexF configParser) allTags
+    tagIndexPath <- getConfigValue configParser "phlog" "tagPath"
+    buildPath <- getConfigValue configParser "general" "buildPath"
+    let outputPath = buildPath ++ "/" ++ tagIndexPath ++ "/" ++ (T.unpack tag) ++ "/.gophermap"
+        outputDirectoryPath = takeDirectory outputPath
+    createDirectoryIfMissing True outputDirectoryPath
+    writeFile outputPath (tagIndexContents tag)
    where
-    -- FIXME: no need for second argument tag
-    writeTagIndexF :: ConfigParser -> Tag -> IO ()
-    writeTagIndexF configParser _ = do
-      tagIndexPath <- getConfigValue configParser "phlog" "tagPath"
-      buildPath <- getConfigValue configParser "general" "buildPath"
-      let outputPath = buildPath ++ "/" ++ tagIndexPath ++ "/" ++ (T.unpack tag) ++ "/.gophermap"
-          outputDirectoryPath = takeDirectory outputPath
-      createDirectoryIfMissing True outputDirectoryPath
-      writeFile outputPath (tagIndexContents tag)
-
     -- FIXME: no need for second argument Tag
     tagIndexContents :: Tag -> String
     tagIndexContents _ =
