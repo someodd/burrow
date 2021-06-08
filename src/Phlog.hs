@@ -74,11 +74,11 @@ instance PhlogIndex PostMetas MainPhlogIndex where
         let sorter (PostMetas pairs) = PostMetas $ sortOn (\y -> snd y >>= \fm -> dateStringToDateTime currentYear <$> date fm) pairs
         fmap sorter readerIntPostMetas
 
-  createIndexModel' postPageMetaPairs = do
+  createIndexModel' postMetasPairs = do
     MainPhlogIndex $ do
       currentYear <- ask
       let 
-      pure $ makePhlogIndex postPageMetaPairs currentYear
+      pure $ makePhlogIndex postMetasPairs currentYear
    where
     -- TODO: actually parse into a nice thing
     -- | An index (gophermap) of all the phlog posts! Just sorts all the
@@ -110,8 +110,8 @@ instance PhlogIndex PostMetas MainPhlogIndex where
 
 
 renderMainPhlogIndex :: PostMetas -> IO ()
-renderMainPhlogIndex postPageMetaPairs = do
-  let mainPhlogIndex = createIndexModel postPageMetaPairs :: MainPhlogIndex
+renderMainPhlogIndex postMetasPairs = do
+  let mainPhlogIndex = createIndexModel postMetasPairs :: MainPhlogIndex
   renderIndexGophermap mainPhlogIndex
 
 
@@ -146,7 +146,7 @@ instance PhlogIndex PostMetas MainTagIndex where
     in MainTagIndex $ HashMap.map (sortOnDate defaultYear) mainTagIndexMap
 
   -- NOTE: due to PhlogIndex SpecificTagIndex being similar, this results in much overlap/recalculation...
-  createIndexModel' (PostMetas postPageMetaPairs) =
+  createIndexModel' (PostMetas postMetasPairs) =
     MainTagIndex $ HashMap.map (take postsPerTag) $ HashMap.fromListWith (++) result
    where
     -- TODO/FIXME: make into config value... will have to use reader?
@@ -155,7 +155,7 @@ instance PhlogIndex PostMetas MainTagIndex where
 
     result :: [ (Tag, [(FilePath, FrontMatter)]) ]
     result =
-      [(tag, take postsPerTag [(filePath, fm)]) | (filePath, Just fm) <- postPageMetaPairs, tag <- tags fm]-- FIXME: what if no tags? that should error right and be just fine?
+      [(tag, take postsPerTag [(filePath, fm)]) | (filePath, Just fm) <- postMetasPairs, tag <- tags fm]-- FIXME: what if no tags? that should error right and be just fine?
 
   renderIndexGophermap (MainTagIndex mainTagIndex) = do
     -- get paths from config
@@ -189,19 +189,19 @@ instance PhlogIndex PostMetas MainTagIndex where
 
 
 -- FIXME: this no longer makes sense the way it compiles results.
--- this one could be more general like PostPageMetaCriterion for cats and authors etc
---newtype PostPageMetaTag = PostPageMetaTag (Tag, PostPageMeta)
+-- this one could be more general like PostMetasCriterion for cats and authors etc
+--newtype PostMetasTag = PostMetasTag (Tag, PostMetas)
 newtype SpecificTagIndex = SpecificTagIndex (Tag, [ (FilePath, FrontMatter) ] )
 
-instance PhlogIndex (PostPageMetaGroupPair Tag) SpecificTagIndex where
+instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
   sortIndexModel (SpecificTagIndex (tag, filePathFrontMatterPairs)) =
     let year = 2021
     in SpecificTagIndex $ (tag, sortOnDate year filePathFrontMatterPairs)
 
-  -- FIXME: is all I need to do is sort postPageMetaPairs?
-  createIndexModel' (PostPageMetaGroupPair (_, tag, postPageMetaPairs)) =
+  -- FIXME: is all I need to do is sort postMetasPairs?
+  createIndexModel' (PostMetasGroupPair (_, tag, postMetasPairs)) =
     -- FIXME
-    SpecificTagIndex (tag, postPageMetaPairs)
+    SpecificTagIndex (tag, postMetasPairs)
 
   renderIndexGophermap (SpecificTagIndex (tag, specificTagIndexes)) = do
     configParser <- getConfig
@@ -219,14 +219,14 @@ instance PhlogIndex (PostPageMetaGroupPair Tag) SpecificTagIndex where
       (T.unpack tag) ++ "\n\n" ++ (intercalate "\n" $ map (makeLocalLink . (fst &&& Just . snd)) $ specificTagIndexes)
 
 
-newtype PostPageMetaGroupPair a = PostPageMetaGroupPair (String, a, [(FilePath, FrontMatter)]) -- this is what get accepted by the thingy builder
-newtype PostPageMetaGroup a = PostPageMetaGroup (String, HashMap.HashMap a [(FilePath, FrontMatter)]) deriving (Show)
+newtype PostMetasGroupPair a = PostMetasGroupPair (String, a, [(FilePath, FrontMatter)]) -- this is what get accepted by the thingy builder
+newtype PostMetasGroup a = PostMetasGroup (String, HashMap.HashMap a [(FilePath, FrontMatter)]) deriving (Show)
 
 
-getPostPageMetaGroupPair :: (Eq a, Hashable a) => PostPageMetaGroup a -> a -> PostPageMetaGroupPair a
-getPostPageMetaGroupPair (PostPageMetaGroup (label, hashMap)) key =
+getPostMetasGroupPair :: (Eq a, Hashable a) => PostMetasGroup a -> a -> PostMetasGroupPair a
+getPostMetasGroupPair (PostMetasGroup (label, hashMap)) key =
   -- FIXME: fromjust
-  PostPageMetaGroupPair (label, key, fromJust $ HashMap.lookup key hashMap)
+  PostMetasGroupPair (label, key, fromJust $ HashMap.lookup key hashMap)
 
 -- | Group posts together by some property of the FrontMatter. Weeds out posts
 -- without FrontMatter.
@@ -235,18 +235,18 @@ getPostPageMetaGroupPair (PostPageMetaGroup (label, hashMap)) key =
 -- value. 
 --
 --
--- >>> (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("title", Identity . title) :: (String, HashMap.HashMap (Maybe T.Text) [(FilePath, FrontMatter)]))
--- >>> (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("tag", tags) :: (String, HashMap.HashMap Tag [(FilePath, FrontMatter)]))
+-- >>> (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("title", Identity . title) :: (String, HashMap.HashMap (Maybe T.Text) [(FilePath, FrontMatter)]))
+-- >>> (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("tag", tags) :: (String, HashMap.HashMap Tag [(FilePath, FrontMatter)]))
 frontMatterHashMapGroup
   :: (Eq a, Hashable a, Foldable f)
   => PostMetas
   -> (String, FrontMatter -> f a)
-  -> PostPageMetaGroup a
-frontMatterHashMapGroup (PostMetas postPageMetaPairs) (groupName, groupFunction) =
-  PostPageMetaGroup $ (groupName, HashMap.fromListWith (++) result)
+  -> PostMetasGroup a
+frontMatterHashMapGroup (PostMetas postMetasPairs) (groupName, groupFunction) =
+  PostMetasGroup $ (groupName, HashMap.fromListWith (++) result)
  where
   result =
-    [ (group, [(filePath, fm)]) | (filePath, Just fm) <- postPageMetaPairs, group <- (toList $ groupFunction fm)]
+    [ (group, [(filePath, fm)]) | (filePath, Just fm) <- postMetasPairs, group <- (toList $ groupFunction fm)]
 
 -- FIXME: define Post as (FilePath, Maybe FrontMatter)?
 
@@ -259,18 +259,18 @@ frontMatterHashMapGroup (PostMetas postPageMetaPairs) (groupName, groupFunction)
 renderTagIndexes :: [(FilePath, Maybe FrontMatter)] ->  IO ()
 renderTagIndexes filePathFrontMatter = do
   -- FIXME: currently only doing tag "foo"
-  --_ <- error . show $ (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("title", Identity . title) :: PostPageMetaGroup (Maybe T.Text))
-  --_ <- error . show $ (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("tag", tags) :: PostPageMetaGroup Tag)
+  --_ <- error . show $ (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("title", Identity . title) :: PostMetasGroup (Maybe T.Text))
+  --_ <- error . show $ (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("tag", tags) :: PostMetasGroup Tag)
 
-  let ppmg@(PostPageMetaGroup (_, hashMap)) = (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("tag", tags) :: PostPageMetaGroup Tag)
+  let ppmg@(PostMetasGroup (_, hashMap)) = (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("tag", tags) :: PostMetasGroup Tag)
       tagsFound = HashMap.keys hashMap
-  traverse_ (\x -> renderIndexGophermap (createIndexModel $ getPostPageMetaGroupPair ppmg x :: SpecificTagIndex)) tagsFound
+  traverse_ (\x -> renderIndexGophermap (createIndexModel $ getPostMetasGroupPair ppmg x :: SpecificTagIndex)) tagsFound
 
   let mainTagIndex = createIndexModel (PostMetas filePathFrontMatter) :: MainTagIndex
   renderIndexGophermap mainTagIndex
 
 
--- TODO: this should be plural... maybe it should be [PostPageMeta]
+-- TODO: this should be plural... maybe it should be [PostMetas]
 -- TODO: better names? filefrontmatterpairs?
 -- | Pairs of filepaths associated with their frontmatter. Useful for posts and pages.
 newtype PostMetas = PostMetas [(FilePath, Maybe FrontMatter)]
@@ -290,7 +290,7 @@ dateStringToDateTime defaultYear dateText = head $ DP.extractDateTimesY (fromInt
 
 
 -- | A useful tool in making phlog indexes: create a nice link for the menu
--- using a supplied pair from PostPageMeta.
+-- using a supplied pair from PostMetas.
 makeLocalLink :: (FilePath, Maybe FrontMatter) -> String
 makeLocalLink (path, maybeFrontMatter)
   | gophermapSuffix `isSuffixOf` path = restOfLink "1"
