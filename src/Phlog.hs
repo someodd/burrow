@@ -47,8 +47,12 @@ class PhlogIndex a b | b -> a where
   -- | Sort the index model.
   sortIndexModel :: b -> b
 
-  -- | Create the data model of the phlog index in question.
+  -- | Create the data model of the phlog index in question. Do not use this
+  -- directly, simply define it.
   createIndexModel' :: a -> b
+
+  -- | Do not override this. This is what you should use to actually
+  -- create the index model.
   createIndexModel :: a -> b
   createIndexModel = sortIndexModel . createIndexModel'
 
@@ -65,6 +69,7 @@ instance PhlogIndex PostPageMeta MainPhlogIndex where
   sortIndexModel (MainPhlogIndex readerIntPostPageMeta) = do
       MainPhlogIndex $ do
         currentYear <- ask
+        -- FIXME: this is so like the sorting function i have external to this instance except the fm is a maybe
         let sorter (PostPageMeta pairs) = PostPageMeta $ sortOn (\y -> snd y >>= \fm -> dateStringToDateTime currentYear <$> date fm) pairs
         fmap sorter readerIntPostPageMeta
 
@@ -117,6 +122,13 @@ getCurrentYear = (\(y,_,_) -> y) <$> (getCurrentTime >>= return . toGregorian . 
 type Tag = T.Text
 
 
+-- TODO: make a type synonym for [(FilePath, FrontMatter)]
+-- | Sort a [(FilePath, FrontMatter)] based on date.
+sortOnDate :: Integer -> [(FilePath, FrontMatter)] -> [(FilePath, FrontMatter)]
+sortOnDate defaultYear =
+  sortOn (\y -> dateStringToDateTime defaultYear <$> date (snd y))
+
+
 -- FIXME TODO
 -- in the future also should look more like a hashmap of tag to [(filepath, frontmatter)]
 -- in fact passing the sorted tag index could be something handy to have as reader in both instances
@@ -130,8 +142,7 @@ instance PhlogIndex PostPageMeta MainTagIndex where
   -- | Sort the hashmap values by date.
   sortIndexModel (MainTagIndex mainTagIndexMap) =
     let defaultYear = 2021
-        sorter = sortOn (\y -> dateStringToDateTime defaultYear <$> date (snd y))
-    in MainTagIndex $ HashMap.map sorter mainTagIndexMap
+    in MainTagIndex $ HashMap.map (sortOnDate defaultYear) mainTagIndexMap
 
   -- NOTE: due to PhlogIndex SpecificTagIndex being similar, this results in much overlap/recalculation...
   createIndexModel' (PostPageMeta postPageMetaPairs) =
@@ -184,7 +195,7 @@ newtype SpecificTagIndex = SpecificTagIndex (Tag, [ (FilePath, FrontMatter) ] )
 instance PhlogIndex (PostPageMetaGroupPair Tag) SpecificTagIndex where
   sortIndexModel (SpecificTagIndex (tag, filePathFrontMatterPairs)) =
     let year = 2021
-    in SpecificTagIndex $ (tag, sortOn (\y -> date (snd y) >>= pure . dateStringToDateTime year) filePathFrontMatterPairs)
+    in SpecificTagIndex $ (tag, sortOnDate year filePathFrontMatterPairs)
 
   -- FIXME: is all I need to do is sort postPageMetaPairs?
   createIndexModel' (PostPageMetaGroupPair (_, tag, postPageMetaPairs)) =
