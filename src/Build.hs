@@ -46,7 +46,7 @@ import qualified Text.Mustache.Types as Mtype
 
 import Control.Monad.Reader
 
-import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter, getFrontMatter, PostMetas(..))
+import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter, getFrontMatter)
 import TextUtils.Headings
 import Markdown
 import Mustache
@@ -380,4 +380,4 @@ buildGopherhole sourceDir destDir spaceCookie = do
   sourceFiles <- getSourceFiles sourceDir :: IO [SourceFile]
   filePathFrontMatter <- traverse (renderFile sourceDir destDir spaceCookie) sourceFiles
   renderTagIndexes filePathFrontMatter
-  renderMainPhlogIndex (PostMetas filePathFrontMatter)
+  renderMainPhlogIndex filePathFrontMatter

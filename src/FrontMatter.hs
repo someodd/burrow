@@ -18,21 +18,32 @@ module FrontMatter (getFrontMatter, FrontMatter(..)) where
 import Data.Attoparsec.ByteString ((<?>))
 import qualified Data.ByteString as ByteString
 import Data.Frontmatter (Parser, IResult(..), frontmatter, parse)
-import Data.Yaml (ParseException, FromJSON, parseJSON, withObject, (.:?), (.:), decodeEither')
+import Data.Yaml (ParseException, FromJSON, parseJSON, withObject, (.:?), decodeEither')
 import Data.Text.Encoding         as T
 import qualified Data.Text as T
 
 
 -- | Representation of the FrontMatter found in a file.
 data FrontMatter = FrontMatter
-  { tags :: ![T.Text]-- FIXME: what if space separated list of tags? TODO: for jekyll frontmatter spec requires to have a list or space separated
-  , date :: Maybe T.Text
-  , title :: Maybe T.Text
+  { fmPublished :: Maybe T.Text
+  , fmUpdated :: Maybe T.Text  
+  , fmTitle :: Maybe T.Text
+  , fmAuthor :: Maybe T.Text
+  , fmTags :: Maybe [T.Text]
+  , fmType :: Maybe T.Text
+  -- ^ Only type supported right now is "post" if defined at all.
   } deriving (Show)
+
 
 -- | Allows for the decoding of ByteString into the `FrontMatter` type.
 instance FromJSON FrontMatter where
-  parseJSON = withObject "FrontMatter" $ \o -> FrontMatter <$> o .: "tags" <*> o .:? "date" <*> o .:? "title"
+  parseJSON = withObject "FrontMatter" $ \o -> FrontMatter
+    <$> o .:? "published"
+    <*> o .:? "updated"
+    <*> o .:? "title"
+    <*> o .:? "author"
+    <*> o .:? "tags"
+    <*> o .:? "type"
 
 -- NOTE: I added a lot of type signatures to help make this function more understandable.
 -- | The parser to be used by `parse`. Works with `FrontMatter`'s `FromJSON`
