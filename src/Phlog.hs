@@ -9,7 +9,7 @@ module Phlog
   -- $phlogIndexes
     renderMainPhlogIndex
   , renderTagIndexes
-  , PostPageMeta(..)
+  , PostMetas(..)
   -- * Re-exports to make handling phlogs easier.
   , FrontMatter
   , getFrontMatter
@@ -63,15 +63,16 @@ class PhlogIndex a b | b -> a where
 
 
 -- The Int is the current year
-newtype MainPhlogIndex = MainPhlogIndex (Reader Integer PostPageMeta)
+newtype MainPhlogIndex = MainPhlogIndex (Reader Integer PostMetas)
 
-instance PhlogIndex PostPageMeta MainPhlogIndex where
-  sortIndexModel (MainPhlogIndex readerIntPostPageMeta) = do
+-- | The main phlog index which contains all of the posts.
+instance PhlogIndex PostMetas MainPhlogIndex where
+  sortIndexModel (MainPhlogIndex readerIntPostMetas) = do
       MainPhlogIndex $ do
         currentYear <- ask
         -- FIXME: this is so like the sorting function i have external to this instance except the fm is a maybe
-        let sorter (PostPageMeta pairs) = PostPageMeta $ sortOn (\y -> snd y >>= \fm -> dateStringToDateTime currentYear <$> date fm) pairs
-        fmap sorter readerIntPostPageMeta
+        let sorter (PostMetas pairs) = PostMetas $ sortOn (\y -> snd y >>= \fm -> dateStringToDateTime currentYear <$> date fm) pairs
+        fmap sorter readerIntPostMetas
 
   createIndexModel' postPageMetaPairs = do
     MainPhlogIndex $ do
@@ -82,9 +83,9 @@ instance PhlogIndex PostPageMeta MainPhlogIndex where
     -- TODO: actually parse into a nice thing
     -- | An index (gophermap) of all the phlog posts! Just sorts all the
     -- filepath/frontmatter pairs.
-    makePhlogIndex :: PostPageMeta -> Integer -> PostPageMeta
-    makePhlogIndex (PostPageMeta meta) defaultYear =
-      PostPageMeta $ sortOn (\y -> snd y >>= \fm -> dateStringToDateTime defaultYear <$> date fm) meta
+    makePhlogIndex :: PostMetas -> Integer -> PostMetas
+    makePhlogIndex (PostMetas meta) defaultYear =
+      PostMetas $ sortOn (\y -> snd y >>= \fm -> dateStringToDateTime defaultYear <$> date fm) meta
 
   renderIndexGophermap (MainPhlogIndex mainPhlogIndex) = do
     -- TODO: list main tag index
@@ -101,14 +102,14 @@ instance PhlogIndex PostPageMeta MainPhlogIndex where
         phlogIndex = runReader mainPhlogIndex currentYear
     writeFile outputPath $ makePhlogIndexPage phlogIndex tagPath
    where
-    makePhlogIndexPage :: PostPageMeta -> FilePath -> String
-    makePhlogIndexPage (PostPageMeta meta) tagIndexPath =
+    makePhlogIndexPage :: PostMetas -> FilePath -> String
+    makePhlogIndexPage (PostMetas meta) tagIndexPath =
       let viewByTagsEntry = show $ MenuLink "1" "view by tags" tagIndexPath Nothing Nothing
           allThePosts = "all phlog posts\n" ++ (intercalate "\n" $ map (makeLocalLink) meta)
       in viewByTagsEntry ++ "\n" ++ allThePosts
 
 
-renderMainPhlogIndex :: PostPageMeta -> IO ()
+renderMainPhlogIndex :: PostMetas -> IO ()
 renderMainPhlogIndex postPageMetaPairs = do
   let mainPhlogIndex = createIndexModel postPageMetaPairs :: MainPhlogIndex
   renderIndexGophermap mainPhlogIndex
@@ -138,14 +139,14 @@ newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [(FilePath, FrontMatter
 -- FIXME/TODO: there's a TON of overlap between this and the other tag indexes so write some helper functions
 -- FIXME/TODO
 -- | The phlog index which lists all the tags and the latest posts for each tag.
-instance PhlogIndex PostPageMeta MainTagIndex where
+instance PhlogIndex PostMetas MainTagIndex where
   -- | Sort the hashmap values by date.
   sortIndexModel (MainTagIndex mainTagIndexMap) =
     let defaultYear = 2021
     in MainTagIndex $ HashMap.map (sortOnDate defaultYear) mainTagIndexMap
 
   -- NOTE: due to PhlogIndex SpecificTagIndex being similar, this results in much overlap/recalculation...
-  createIndexModel' (PostPageMeta postPageMetaPairs) =
+  createIndexModel' (PostMetas postPageMetaPairs) =
     MainTagIndex $ HashMap.map (take postsPerTag) $ HashMap.fromListWith (++) result
    where
     -- TODO/FIXME: make into config value... will have to use reader?
@@ -238,10 +239,10 @@ getPostPageMetaGroupPair (PostPageMetaGroup (label, hashMap)) key =
 -- >>> (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("tag", tags) :: (String, HashMap.HashMap Tag [(FilePath, FrontMatter)]))
 frontMatterHashMapGroup
   :: (Eq a, Hashable a, Foldable f)
-  => PostPageMeta
+  => PostMetas
   -> (String, FrontMatter -> f a)
   -> PostPageMetaGroup a
-frontMatterHashMapGroup (PostPageMeta postPageMetaPairs) (groupName, groupFunction) =
+frontMatterHashMapGroup (PostMetas postPageMetaPairs) (groupName, groupFunction) =
   PostPageMetaGroup $ (groupName, HashMap.fromListWith (++) result)
  where
   result =
@@ -261,18 +262,18 @@ renderTagIndexes filePathFrontMatter = do
   --_ <- error . show $ (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("title", Identity . title) :: PostPageMetaGroup (Maybe T.Text))
   --_ <- error . show $ (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("tag", tags) :: PostPageMetaGroup Tag)
 
-  let ppmg@(PostPageMetaGroup (_, hashMap)) = (frontMatterHashMapGroup (PostPageMeta filePathFrontMatter) ("tag", tags) :: PostPageMetaGroup Tag)
+  let ppmg@(PostPageMetaGroup (_, hashMap)) = (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("tag", tags) :: PostPageMetaGroup Tag)
       tagsFound = HashMap.keys hashMap
   traverse_ (\x -> renderIndexGophermap (createIndexModel $ getPostPageMetaGroupPair ppmg x :: SpecificTagIndex)) tagsFound
 
-  let mainTagIndex = createIndexModel (PostPageMeta filePathFrontMatter) :: MainTagIndex
+  let mainTagIndex = createIndexModel (PostMetas filePathFrontMatter) :: MainTagIndex
   renderIndexGophermap mainTagIndex
 
 
 -- TODO: this should be plural... maybe it should be [PostPageMeta]
 -- TODO: better names? filefrontmatterpairs?
 -- | Pairs of filepaths associated with their frontmatter. Useful for posts and pages.
-newtype PostPageMeta = PostPageMeta [(FilePath, Maybe FrontMatter)]
+newtype PostMetas = PostMetas [(FilePath, Maybe FrontMatter)]
 
 
 -- FIXME: could error out (usage of `head`)
