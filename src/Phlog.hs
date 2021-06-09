@@ -11,7 +11,7 @@ module Phlog
   , renderTagIndexes
   , PostMetas(..)
   -- * Re-exports to make handling phlogs easier.
-  , FrontMatter
+  , FrontMatter(..)
   , getFrontMatter
   ) where
 
