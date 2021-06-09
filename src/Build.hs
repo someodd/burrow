@@ -207,17 +207,20 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
       -- so we can load frontmatter FIRST.
       fileText <- TIO.readFile (sourceDirectory ++ "/" ++ filePath)
       let (frontMatter, restOfDocument) = getFrontMatter fileText
-      testContents <- parseMustache restOfDocument recipe frontMatter :: IO T.Text -- FIXME: send frontMatter variables
+          potentialTestContents = parseMustache restOfDocument recipe frontMatter :: IO T.Text
+      testContents <- if fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
+        then pure restOfDocument
+        else potentialTestContents
+
       -- FIXME: need a function to parse the frontmatter and remove it from contents instead
       -- right here instead of making up bogus at end
       -- FIXME: this is writing out... that's bad! this function should handle it isntead! so
       -- fix up the markdown function.
+      -- FIXME: should not parse markdown to file here, it should return the file contents!
       parseMarkdown recipe testContents -- FIXME: needs to just output text instead?
       -- FIXME: output to text instead ^ and then we can also easily handle how to write out?
       -- should have function yeah? this will make chaining manipulations easier?
-      case frontMatter of
-        Just _ -> pure (fst sourceFile, frontMatter)
-        Nothing -> pure (fst sourceFile, Nothing)
+      pure (fst sourceFile, frontMatter)
  where
   -- Don't parse; just copy the file to the target directory.
   noParseOut :: FileRenderRecipe -> IO ()

@@ -33,7 +33,7 @@ data FrontMatter = FrontMatter
   , fmTags :: Maybe [T.Text]
   , fmType :: Maybe T.Text
   -- ^ Only type supported right now is "post" if defined at all.
-  , fmVariables :: Maybe (Map.Map T.Text T.Text)
+  , fmVariables :: Maybe (Map.Map T.Text T.Text) -- FIXME: maybe fmSubstitutions would be a better name?
   -- ^ Allows you to set Mustasche substitutions for the final rendered product.
   -- For example, if you define:
   --
@@ -41,6 +41,10 @@ data FrontMatter = FrontMatter
   --
   -- ... in your frontmatter, then any instance of {{ someVariable }}, in a partial
   -- or directly in the post itself will be replaced with "hello, world!"
+  , fmSkipMustache :: Maybe Bool
+  -- ^ Do not use the Mustache parser for this file.
+  , fmSkipMarkdown :: Maybe Bool
+  -- ^ Do not use the Markdown parser for this file.
   } deriving (Show)
 
 
@@ -54,6 +58,8 @@ instance FromJSON FrontMatter where
     <*> o .:? "tags"
     <*> o .:? "type"
     <*> o .:? "variables"
+    <*> o .:? "skipMustache"
+    <*> o .:? "skipMarkdown"
 
 -- NOTE: I added a lot of type signatures to help make this function more understandable.
 -- | The parser to be used by `parse`. Works with `FrontMatter`'s `FromJSON`
