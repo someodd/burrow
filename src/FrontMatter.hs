@@ -15,6 +15,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 module FrontMatter (getFrontMatter, FrontMatter(..), FileFrontMatter) where
 
+import qualified Data.Dates.Parsing as DP
 import Data.Map as Map
 import Data.Attoparsec.ByteString ((<?>))
 import qualified Data.ByteString as ByteString
@@ -30,8 +31,8 @@ type FileFrontMatter = (FilePath, Maybe FrontMatter)
 
 -- | Representation of the FrontMatter found in a file.
 data FrontMatter = FrontMatter
-  { fmPublished :: Maybe T.Text
-  , fmUpdated :: Maybe T.Text  
+  { fmPublished :: Maybe DP.DateTime
+  , fmUpdated :: Maybe DP.DateTime
   , fmTitle :: Maybe T.Text
   , fmAuthor :: Maybe T.Text
   , fmTags :: Maybe [T.Text]
@@ -55,8 +56,8 @@ data FrontMatter = FrontMatter
 -- | Allows for the decoding of ByteString into the `FrontMatter` type.
 instance FromJSON FrontMatter where
   parseJSON = withObject "FrontMatter" $ \o -> FrontMatter
-    <$> o .:? "published"
-    <*> o .:? "updated"
+    <$> (fmap (>>= dateStringToDateTime 2021) $ o .:? "published")
+    <*> (fmap (>>= dateStringToDateTime 2021) $ o .:? "updated")
     <*> o .:? "title"
     <*> o .:? "author"
     <*> o .:? "tags"
@@ -89,6 +90,7 @@ frontmatterBurrow =
       -- decodeEither' will use the parseJSON method for `FrontMatter`.
       Right frontMatter -> return frontMatter:: Parser FrontMatter
 
+
 -- | If the `FrontMatter` can be retreived, return it, along with the rest of
 -- the document with the Frontmatter removed.
 getFrontMatter :: T.Text -> (Maybe FrontMatter, T.Text)
@@ -105,3 +107,17 @@ getFrontMatter text = do
                      Fail _ _ errorMsg -> error errorMsg
       -- Either a failure to parse the `FrontMatter`, or there was none!
       Fail _ _ _ -> (Nothing, text)
+
+
+-- FIXME: add fancy error for this and also make a part of frontmatter and automatically transform into this type?
+-- FIXME: could error out (usage of `head`)
+-- | Fuzzy match a date time string (for a `FrontMatter` date/time definition).
+--
+-- `extractDateTimesY` does all the heavy lifting.
+--
+-- >>> dateStringToDateTime (2021 :: Integer) (T.pack "july 29")
+-- DateTime {dtDate = Date {dateYear = 2021, dateMonth = July, dateDay = 29}, dtTime = TimeOfDay {todHour = 0h, todMin = 0m, todSec = 0s, todNSec = 0ns}}
+-- >>> dateStringToDateTime (2021 :: Integer) (T.pack "2021-06-20T04:30")
+-- DateTime {dtDate = Date {dateYear = 2021, dateMonth = June, dateDay = 20}, dtTime = TimeOfDay {todHour = 0h, todMin = 0m, todSec = 0s, todNSec = 0ns}}
+dateStringToDateTime :: Integer -> T.Text -> Maybe DP.DateTime
+dateStringToDateTime defaultYear dateText = Just $ head $ DP.extractDateTimesY (fromIntegral defaultYear :: Int) (T.unpack dateText)
