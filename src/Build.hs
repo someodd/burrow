@@ -27,6 +27,7 @@ module Build
   ) 
 where
 
+import Data.Maybe (fromMaybe)
 import System.Directory (copyFile)
 import qualified Data.HashMap.Strict as H
 import Data.List (isSuffixOf)
@@ -46,7 +47,7 @@ import qualified Text.Mustache.Types as Mtype
 
 import Control.Monad.Reader
 
-import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter, getFrontMatter)
+import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter(..), getFrontMatter)
 import TextUtils.Headings
 import Markdown
 import Mustache
@@ -206,7 +207,7 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
       -- so we can load frontmatter FIRST.
       fileText <- TIO.readFile (sourceDirectory ++ "/" ++ filePath)
       let (frontMatter, restOfDocument) = getFrontMatter fileText
-      testContents <- parseMustache restOfDocument recipe :: IO T.Text
+      testContents <- parseMustache restOfDocument recipe frontMatter :: IO T.Text -- FIXME: send frontMatter variables
       -- FIXME: need a function to parse the frontmatter and remove it from contents instead
       -- right here instead of making up bogus at end
       -- FIXME: this is writing out... that's bad! this function should handle it isntead! so
@@ -262,8 +263,8 @@ data FileRenderRecipe = FileRenderRecipe
 -- TODO: don't load main file here. you wanna load frontmatter FIRST before using this function and use frontmatter to insert into recipe which should have a Maybe FrontMater part?
 -- TODO: prepareTemplate = do
 -- | Prepares the file which needs to be parsed as a Mustache template.
-parseMustache :: T.Text -> FileRenderRecipe -> IO T.Text
-parseMustache mainText recipe = do
+parseMustache :: T.Text -> FileRenderRecipe -> Maybe FrontMatter -> IO T.Text
+parseMustache mainText recipe maybeFrontMatter = do
   -- TODO: insert global substitutions from frontmatter, also add frontmatter to recipe prior?
   mainTemplate <-
     case pfrIncludePartial recipe of
@@ -272,7 +273,8 @@ parseMustache mainText recipe = do
   -- could put this in the prepareTemplate?
   -- should put this stuff in Mustache
   -- FIXME: what's happening here?!
-  let k = Map.fromList (pfrSubstitutions recipe) :: Map.Map T.Text Mtype.Value
+  let fmSubs = fromMaybe [] ( maybeFrontMatter >>= \fm -> fmap (Map.toList . Map.map (Mtype.String)) $ fmVariables fm ) :: [(T.Text, Mtype.Value)]
+  let k = Map.fromList (pfrSubstitutions recipe ++ fmSubs) :: Map.Map T.Text Mtype.Value
       -- where is this substitute function coming from?! is it commonmark to preform the partial substitution?
       testContents = substitute mainTemplate k
       -- also i wish i could do the partial subs... shouldn't that be easy, actually?

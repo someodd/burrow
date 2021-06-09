@@ -15,6 +15,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 module FrontMatter (getFrontMatter, FrontMatter(..)) where
 
+import Data.Map as Map
 import Data.Attoparsec.ByteString ((<?>))
 import qualified Data.ByteString as ByteString
 import Data.Frontmatter (Parser, IResult(..), frontmatter, parse)
@@ -32,6 +33,14 @@ data FrontMatter = FrontMatter
   , fmTags :: Maybe [T.Text]
   , fmType :: Maybe T.Text
   -- ^ Only type supported right now is "post" if defined at all.
+  , fmVariables :: Maybe (Map.Map T.Text T.Text)
+  -- ^ Allows you to set Mustasche substitutions for the final rendered product.
+  -- For example, if you define:
+  --
+  --    varibles: {"someVariable": "hello, world!"}
+  --
+  -- ... in your frontmatter, then any instance of {{ someVariable }}, in a partial
+  -- or directly in the post itself will be replaced with "hello, world!"
   } deriving (Show)
 
 
@@ -44,6 +53,7 @@ instance FromJSON FrontMatter where
     <*> o .:? "author"
     <*> o .:? "tags"
     <*> o .:? "type"
+    <*> o .:? "variables"
 
 -- NOTE: I added a lot of type signatures to help make this function more understandable.
 -- | The parser to be used by `parse`. Works with `FrontMatter`'s `FromJSON`
