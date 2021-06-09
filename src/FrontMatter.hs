@@ -13,7 +13,7 @@
 -- Also handles the creation of tag and the main indexes for the phlog.
 -- Phlogging tools in general.
 {-# LANGUAGE OverloadedStrings          #-}
-module FrontMatter (getFrontMatter, FrontMatter(..)) where
+module FrontMatter (getFrontMatter, FrontMatter(..), FileFrontMatter) where
 
 import Data.Map as Map
 import Data.Attoparsec.ByteString ((<?>))
@@ -22,6 +22,10 @@ import Data.Frontmatter (Parser, IResult(..), frontmatter, parse)
 import Data.Yaml (ParseException, FromJSON, parseJSON, withObject, (.:?), decodeEither')
 import Data.Text.Encoding         as T
 import qualified Data.Text as T
+
+
+-- | A filepath and its associated filematter meta (if any).
+type FileFrontMatter = (FilePath, Maybe FrontMatter)
 
 
 -- | Representation of the FrontMatter found in a file.

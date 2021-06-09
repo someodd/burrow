@@ -9,7 +9,6 @@ module Phlog
   -- $phlogIndexes
     renderMainPhlogIndex
   , renderTagIndexes
-  , PostMetas(..)
   -- * Re-exports to make handling phlogs easier.
   , FrontMatter(..)
   , getFrontMatter
@@ -38,7 +37,7 @@ import qualified Data.Text as T
 
 import Config (getConfig, getConfigValue)
 import Common (gophermapSuffix, textFileSuffix)
-import FrontMatter (FrontMatter(..), getFrontMatter)
+import FrontMatter (FileFrontMatter, FrontMatter(..), getFrontMatter)
 
 -- NOTE/TODO/FIXME: would it be worth forcing all [ (FilePath, FrontMatter) ] to Maybe
 -- FrontMatter for consistency or should we introduce a new type for that? If we were
@@ -62,7 +61,7 @@ data PostMeta = PostMeta
 
 -- FIXME: need beautiful errors informing a user of what is needed.
 -- only trigger this if it is post type?
-pairToPostMeta :: (FilePath, Maybe FrontMatter) -> Maybe PostMeta
+pairToPostMeta :: FileFrontMatter -> Maybe PostMeta
 pairToPostMeta (filePath, Just frontMatter) = Just $ PostMeta
   { metaPublished = fromJust $ fmPublished frontMatter
   , metaUpdated = fromMaybe (fromJust $ fmPublished frontMatter) (fmUpdated frontMatter)
@@ -77,7 +76,7 @@ pairToPostMeta (_, Nothing) = Nothing
 
 -- must filter out non post types FIXME
 -- | Filters out non-posts based on the type: post.
-preparePostsOnlyFromPairs :: [(FilePath, Maybe FrontMatter)] -> [PostMeta]
+preparePostsOnlyFromPairs :: [FileFrontMatter] -> [PostMeta]
 preparePostsOnlyFromPairs filePathFrontMatterPairs = do
   [postMeta | pair@(_, Just frontMatter) <- filePathFrontMatterPairs, fromMaybe False (fmType frontMatter >>= \t -> Just $ t == "post"), let (Just postMeta) = pairToPostMeta pair]
 
@@ -278,7 +277,7 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
     XML.writeFile def "built/phlog/main.xml" atomFeed
 
 
-renderMainPhlogIndex :: [(FilePath, Maybe FrontMatter)] -> IO ()
+renderMainPhlogIndex :: [FileFrontMatter] -> IO ()
 renderMainPhlogIndex pairs = do
   let mainPhlogIndex = createIndexModel (preparePostsOnlyFromPairs pairs) :: MainPhlogIndex
   renderAll mainPhlogIndex
@@ -292,8 +291,7 @@ getCurrentYear = (\(y,_,_) -> y) <$> (getCurrentTime >>= return . toGregorian . 
 type Tag = T.Text
 
 
--- TODO: make a type synonym for [(FilePath, FrontMatter)]
--- | Sort a [(FilePath, FrontMatter)] based on date.
+-- | Sort [PostMeta] based on date.
 sortOnDate :: Integer -> [PostMeta] -> [PostMeta]
 sortOnDate defaultYear =
   sortOn (\y -> dateStringToDateTime defaultYear $ metaUpdated y)
@@ -358,8 +356,7 @@ instance PhlogIndex [PostMeta] MainTagIndex where
             ]
       in intercalate "\n\n" $ map threeSummary allTags
 
-  -- FIXME: how will i assemble this?
-  --newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [(FilePath, FrontMatter)])
+  -- FIXME/TODO: this is not doing what it should be! very sloppily put together...
   renderAtom (MainTagIndex mainTagIndexMap) = do
     -- FIXME: bad!
     phlogConfig <- getPhlogConfig
@@ -460,12 +457,6 @@ renderTagIndexes filePathFrontMatter = do
 
   let mainTagIndex = createIndexModel (preparePostsOnlyFromPairs filePathFrontMatter) :: MainTagIndex
   renderAll mainTagIndex
-
-
--- TODO: this should be plural... maybe it should be [PostMetas]
--- TODO: better names? filefrontmatterpairs?
--- | Pairs of filepaths associated with their frontmatter. Useful for posts and pages.
-newtype PostMetas = PostMetas [(FilePath, Maybe FrontMatter)]
 
 
 -- FIXME: could error out (usage of `head`)
