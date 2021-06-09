@@ -15,7 +15,6 @@ module Phlog
   , FileFrontMatter
   ) where
 
---import Data.Functor.Identity (Identity(..))
 import Data.Hourglass as HG
 import Data.Default (def)
 import qualified Text.XML as XML
@@ -423,9 +422,9 @@ getPostMetasGroupPair (PostMetasGroup (label, hashMap)) key =
 -- If you're not getting a value that is a list you can use Identity as the return
 -- value. 
 --
---
--- >>> (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("title", Identity . title) :: (String, HashMap.HashMap (Maybe T.Text) [(FilePath, FrontMatter)]))
--- >>> (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("tag", tags) :: (String, HashMap.HashMap Tag [(FilePath, FrontMatter)]))
+-- >>> import Data.Functor.Identity (Identity(..))
+-- >>> (frontMatterHashMapGroup somePostMetas ("title", Identity . title) :: (String, HashMap.HashMap (Maybe T.Text) [PostMeta))
+-- >>> (frontMatterHashMapGroup somePostMetas ("tag", tags) :: (String, HashMap.HashMap Tag [PostMeta]))
 frontMatterHashMapGroup
   :: (Eq a, Hashable a, Foldable f)
   => [PostMeta]
@@ -437,21 +436,15 @@ frontMatterHashMapGroup postMetaList (groupName, groupFunction) =
   result =
     [ (group, [postMeta]) | postMeta <- postMetaList, group <- (toList $ groupFunction postMeta)]
 
--- FIXME: define Post as (FilePath, Maybe FrontMatter)?
 
--- FIXME: should i have a function that will create a separation of all the tags into their respective groups so it generates efficiently? this could also be used by the main tag index
--- FIXME: need to get all tags and then traverse or something
 -- | Render the tag indexes from a collection of file paths and their
--- associated `FrontMatter`, which contains the tags for that file.
+-- associated `FrontMatter` (if any), which contains the tags for that file.
 --
 -- The tags are written out to the supplied `FilePath`.
-renderTagIndexes :: [(FilePath, Maybe FrontMatter)] -> IO ()
+renderTagIndexes :: [FileFrontMatter] -> IO ()
 renderTagIndexes filePathFrontMatter = do
-  -- FIXME: currently only doing tag "foo"
-  --_ <- error . show $ (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("title", Identity . title) :: PostMetasGroup (Maybe T.Text))
-  --_ <- error . show $ (frontMatterHashMapGroup (PostMetas filePathFrontMatter) ("tag", tags) :: PostMetasGroup Tag)
   let postMetaList = preparePostsOnlyFromPairs filePathFrontMatter
-      -- FIXME: shouldn't I filter out no tags instead of putting into "None" group?
+      -- FIXME/TODO: I filter out no tags instead of putting into [] group?
       ppmg@(PostMetasGroup (_, hashMap)) = (frontMatterHashMapGroup postMetaList ("tag", \pm -> fromMaybe [] (metaTags pm)) :: PostMetasGroup Tag)
       tagsFound = HashMap.keys hashMap
   traverse_ (\x -> renderAll (createIndexModel $ getPostMetasGroupPair ppmg x :: SpecificTagIndex)) tagsFound
@@ -460,6 +453,7 @@ renderTagIndexes filePathFrontMatter = do
   renderAll mainTagIndex
 
 
+-- FIXME: add fancy error for this and also make a part of frontmatter and automatically transform into this type?
 -- FIXME: could error out (usage of `head`)
 -- | Fuzzy match a date time string (for a `FrontMatter` date/time definition).
 --
