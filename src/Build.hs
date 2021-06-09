@@ -217,11 +217,27 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
       -- FIXME: this is writing out... that's bad! this function should handle it isntead! so
       -- fix up the markdown function.
       -- FIXME: should not parse markdown to file here, it should return the file contents!
-      parseMarkdown recipe testContents -- FIXME: needs to just output text instead?
-      -- FIXME: output to text instead ^ and then we can also easily handle how to write out?
-      -- should have function yeah? this will make chaining manipulations easier?
+      let filePathToWriteTo = pfrOutPath recipe
+          potentialFinalContents = parseMarkdown recipe testContents :: IO T.Text
+      finalContents <- if fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
+        then pure testContents
+        else potentialFinalContents
+      finalFilePathToWriteTo <- finalFilePath filePathToWriteTo recipe
+      writeFile finalFilePathToWriteTo (T.unpack finalContents) -- first time it's written
       pure (fst sourceFile, frontMatter)
  where
+  -- | Some magic for choosing the target path to write to for files being
+  -- parsed. This is because of the .gopherpath/directory index behavior.
+  finalFilePath :: FilePath -> FileRenderRecipe -> IO FilePath
+  finalFilePath filePath' recipe = do
+    let outPath =
+          if (pfrSpacecookie recipe) && spacecookieGophermapName `isSuffixOf` filePath'
+            then let x = (takeDirectory $ pfrDestinationDirectory recipe ++ filePath') in x ++ "/.gophermap"
+            else pfrDestinationDirectory recipe ++ filePath'
+        directory = takeDirectory $ pfrDestinationDirectory recipe ++ (pfrOutPath recipe)
+    createDirectoryIfMissing True directory
+    pure outPath
+
   -- Don't parse; just copy the file to the target directory.
   noParseOut :: FileRenderRecipe -> IO ()
   noParseOut recipe = do
@@ -316,9 +332,8 @@ parseMustache mainText recipe maybeFrontMatter = do
     pure mainTemplate
 
 
--- FIXME: this does too much, including writing out. should just give back bytes or something idk
--- FIXME: should just output IO T.Text
-parseMarkdown :: FileRenderRecipe -> T.Text -> IO ()
+-- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
+parseMarkdown :: FileRenderRecipe -> T.Text -> IO T.Text
 parseMarkdown recipe contents =
   case pfrParseType recipe of
     -- NOTE: The way this type is setup seems redundant/adds extra maintenence just use a sumtype like ParseType = GopherFile | GopherMenu? FIXME/NOTE/TODO
@@ -332,27 +347,17 @@ parseMarkdown recipe contents =
     Skip -> do
       error "parseMarkdown cannot be used on file types not intended for it."
  where
-  -- This is where the file will be writen out to.
-  filePath :: FilePath
-  filePath = pfrOutPath recipe
-
   -- When used needs to specify the type. 
   parseCommonmark testContents' = commonmarkWith defaultSyntaxSpec "test" testContents'
 
   -- Write text to the target/built directory, creating directories in the process if needed.
   -- Will also write out to the file name .gophermap if the input file name matched spacecookieGophermapName.
-  writeOut :: T.Text -> IO ()
+  writeOut :: T.Text -> IO T.Text
   writeOut text = do
-    let outPath =
-          if (pfrSpacecookie recipe) && spacecookieGophermapName `isSuffixOf` filePath
-            then let x = (takeDirectory $ pfrDestinationDirectory recipe ++ filePath) in x ++ "/.gophermap"
-            else pfrDestinationDirectory recipe ++ filePath
-        directory = takeDirectory $ pfrDestinationDirectory recipe ++ (pfrOutPath recipe)
-    createDirectoryIfMissing True directory
-    writeFile outPath $ T.unpack text
+     pure text
 
   -- Parse the contents as a text file for gopherspace and write out to the target directory.
-  parseOutGopherFile :: IO ()
+  parseOutGopherFile :: IO T.Text
   parseOutGopherFile = do
     out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherFile))
     case out of
@@ -364,7 +369,7 @@ parseMarkdown recipe contents =
         writeOut out'
 
   -- Parse the contents as a Gopher menu/gophermap for gopherspace and write out to the target directory.
-  parseOutGopherMenu :: IO ()
+  parseOutGopherMenu :: IO T.Text
   parseOutGopherMenu = do
     out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherFile))
     case out of
