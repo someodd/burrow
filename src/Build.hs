@@ -47,7 +47,7 @@ import qualified Text.Mustache.Types as Mtype
 
 import Control.Monad.Reader
 
-import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter(..), getFrontMatter)
+import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter(..), getFrontMatter, FileFrontMatter)
 import TextUtils.Headings
 import Markdown
 import Mustache
@@ -185,7 +185,7 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
 -- NOTE: a good place to add hooks?
 -- TODO: return index/state? the tag index can be expanded to a more general crawler later to have
 -- a hook to do a bunch of stuf with accumulated frontmatter or something?
-renderFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO (FilePath, Maybe FrontMatter)
+renderFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
 renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath, parseType) = do
   recipe <- createRenderRecipe sourceDirectory destinationDirectory spaceCookie sourceFile
   -- TODO/FIXME: you have to implement frontmatter parsing here and pass off the modified

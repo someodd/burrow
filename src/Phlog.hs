@@ -12,6 +12,7 @@ module Phlog
   -- * Re-exports to make handling phlogs easier.
   , FrontMatter(..)
   , getFrontMatter
+  , FileFrontMatter
   ) where
 
 --import Data.Functor.Identity (Identity(..))
