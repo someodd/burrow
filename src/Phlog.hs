@@ -48,8 +48,8 @@ import FrontMatter (FileFrontMatter, FrontMatter(..), getFrontMatter)
 -- largely to be indexed properly, to be sortable, and to be capable of being
 -- put into atom/feed format.
 data PostMeta = PostMeta
-  { metaPublished :: T.Text--should be datetime
-  , metaUpdated :: T.Text--when created defaults to metaPublished if not exist
+  { metaPublished :: DP.DateTime--should be datetime
+  , metaUpdated :: DP.DateTime--when created defaults to metaPublished if not exist
   , metaPath :: T.Text
   -- ^ File path (relative) to the post.
   , metaTitle :: T.Text
@@ -153,13 +153,8 @@ instance ToXML AtomFeedEntryRecipe where
        element "updated" $ content (rfc3339 $ metaUpdated postMeta)
 
 -- | The Atom spec wants rfc3339 (ISO8601 as far as I can tell) datetime strings.
-rfc3339 :: T.Text -> T.Text
-rfc3339 dateString =
-  -- FIXME: could just put current year into the feed recipe?
-  let currentYear = 2021
-      -- TODO: config to set timezone
-      dateTime = (HG.timePrint HG.ISO8601_DateAndTime $ (dateStringToDateTime currentYear dateString))
-  in T.pack $ dateTime
+rfc3339 :: DP.DateTime -> T.Text
+rfc3339 = T.pack . HG.timePrint HG.ISO8601_DateAndTime
 
 createAtomFeed :: AtomFeedRecipe -> XML.Document
 createAtomFeed atomFeedRecipe = do
@@ -177,7 +172,7 @@ createAtomFeed atomFeedRecipe = do
  where
   -- FIXME: repeats/overlap rfc3339
   lastUpdated :: String
-  lastUpdated = HG.timePrint HG.ISO8601_DateAndTime $ maximum $ map (dateStringToDateTime 2021 . metaUpdated) $ atomEntries atomFeedRecipe
+  lastUpdated = HG.timePrint HG.ISO8601_DateAndTime $ maximum $ map metaUpdated $ atomEntries atomFeedRecipe
 
   atomDocument children = XML.Document
     { XML.documentPrologue = XML.Prologue def def def
@@ -222,6 +217,7 @@ class PhlogIndex a b | b -> a where
   renderAll b = renderAtom b >> renderIndexGophermap b
 
 
+-- FIXME: no need for reader anymore (year)
 -- The Int is the current year
 newtype MainPhlogIndex = MainPhlogIndex (Reader Integer [PostMeta])
 
@@ -229,22 +225,14 @@ newtype MainPhlogIndex = MainPhlogIndex (Reader Integer [PostMeta])
 instance PhlogIndex [PostMeta] MainPhlogIndex where
   sortIndexModel (MainPhlogIndex readerIntPostMetas) = do
       MainPhlogIndex $ do
-        currentYear <- ask
-        -- FIXME: this is so like the sorting function i have external to this instance except the fm is a maybe
-        let sorter = sortOn (\pm -> dateStringToDateTime currentYear $ metaUpdated pm)
-        fmap sorter readerIntPostMetas
+        -- FIXME
+        _ <- ask
+        fmap (sortOn metaUpdated) readerIntPostMetas
 
   createIndexModel' postMetasPairs = do
     MainPhlogIndex $ do
-      currentYear <- ask
-      pure $ makePhlogIndex postMetasPairs currentYear
-   where
-    -- TODO: actually parse into a nice thing
-    -- | An index (gophermap) of all the phlog posts! Just sorts all the
-    -- filepath/frontmatter pairs.
-    makePhlogIndex :: [PostMeta] -> Integer -> [PostMeta]
-    makePhlogIndex postMetas defaultYear =
-      sortOn (\y -> dateStringToDateTime defaultYear $ metaPublished y) postMetas
+      _ <- ask
+      pure $ postMetasPairs
 
   renderIndexGophermap (MainPhlogIndex mainPhlogIndex) = do
     -- TODO: list main tag index
@@ -291,10 +279,10 @@ getCurrentYear = (\(y,_,_) -> y) <$> (getCurrentTime >>= return . toGregorian . 
 type Tag = T.Text
 
 
+-- FIXME: do not need defaultYear anymore
 -- | Sort [PostMeta] based on date.
 sortOnDate :: Integer -> [PostMeta] -> [PostMeta]
-sortOnDate defaultYear =
-  sortOn (\y -> dateStringToDateTime defaultYear $ metaUpdated y)
+sortOnDate _ = sortOn metaUpdated
 
 
 -- FIXME TODO
@@ -451,20 +439,6 @@ renderTagIndexes filePathFrontMatter = do
 
   let mainTagIndex = createIndexModel (preparePostsOnlyFromPairs filePathFrontMatter) :: MainTagIndex
   renderAll mainTagIndex
-
-
--- FIXME: add fancy error for this and also make a part of frontmatter and automatically transform into this type?
--- FIXME: could error out (usage of `head`)
--- | Fuzzy match a date time string (for a `FrontMatter` date/time definition).
---
--- `extractDateTimesY` does all the heavy lifting.
---
--- >>> dateStringToDateTime (2021 :: Integer) (T.pack "july 29")
--- DateTime {dtDate = Date {dateYear = 2021, dateMonth = July, dateDay = 29}, dtTime = TimeOfDay {todHour = 0h, todMin = 0m, todSec = 0s, todNSec = 0ns}}
--- >>> dateStringToDateTime (2021 :: Integer) (T.pack "2021-06-20T04:30")
--- DateTime {dtDate = Date {dateYear = 2021, dateMonth = June, dateDay = 20}, dtTime = TimeOfDay {todHour = 0h, todMin = 0m, todSec = 0s, todNSec = 0ns}}
-dateStringToDateTime :: Integer -> T.Text -> DP.DateTime
-dateStringToDateTime defaultYear dateText = head $ DP.extractDateTimesY (fromIntegral defaultYear :: Int) (T.unpack dateText)
 
 
 -- | A useful tool in making phlog indexes: create a nice link for the menu
