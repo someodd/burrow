@@ -80,6 +80,8 @@ common shared-properties
     hashable,
     fuzzy-dates,
     hourglass,
+    raw-strings-qq,
+    neat-interpolation,
     yaml
 
   -- LANGUAGE extensions used by modules in this package.

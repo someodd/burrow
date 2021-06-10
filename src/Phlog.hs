@@ -39,22 +39,21 @@ import Config (getConfig, getConfigValue)
 import Common (gophermapSuffix, textFileSuffix)
 import FrontMatter (FileFrontMatter, FrontMatter(..), getFrontMatter)
 
--- NOTE/TODO/FIXME: would it be worth forcing all [ (FilePath, FrontMatter) ] to Maybe
--- FrontMatter for consistency or should we introduce a new type for that? If we were
--- consistent more things could be shared!
-
 
 -- | This is like `FrontMatter`, except blog posts require certain metadata,
 -- largely to be indexed properly, to be sortable, and to be capable of being
 -- put into atom/feed format.
+--
+-- To get all the info on what each record means look at `FrontMatter`.
 data PostMeta = PostMeta
-  { metaPublished :: DP.DateTime--should be datetime
-  , metaUpdated :: DP.DateTime--when created defaults to metaPublished if not exist
+  { metaPublished :: DP.DateTime
+  , metaUpdated :: DP.DateTime-- FIXME: use Data.Default so it can default to metaPublished.
+  -- ^ Defaults to metaPublished.
   , metaPath :: T.Text
   -- ^ File path (relative) to the post.
   , metaTitle :: T.Text
   , metaAuthor :: Maybe T.Text
-  , metaTags :: Maybe [T.Text]-- FIXME: remove Maybe because [] indicates no tags, anyway!
+  , metaTags :: Maybe [T.Text]
   , metaFrontMatter :: FrontMatter
   -- ^ All of the FrontMatter.
   } deriving (Show)
