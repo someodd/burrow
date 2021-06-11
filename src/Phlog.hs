@@ -438,10 +438,13 @@ renderTagIndexes filePathFrontMatter = do
       -- FIXME/TODO: I filter out no tags instead of putting into [] group?
       ppmg@(PostMetasGroup (_, hashMap)) = (frontMatterHashMapGroup postMetaList ("tag", \pm -> fromMaybe [] (metaTags pm)) :: PostMetasGroup Tag)
       tagsFound = HashMap.keys hashMap
-  traverse_ (\x -> renderAll (createIndexModel $ getPostMetasGroupPair ppmg x :: SpecificTagIndex)) tagsFound
-
-  let mainTagIndex = createIndexModel (preparePostsOnlyFromPairs filePathFrontMatter) :: MainTagIndex
-  renderAll mainTagIndex
+  -- Only render tag indexes if there are any tags to render.
+  if length tagsFound == 0
+     then do
+      traverse_ (\x -> renderAll (createIndexModel $ getPostMetasGroupPair ppmg x :: SpecificTagIndex)) tagsFound
+      let mainTagIndex = createIndexModel (preparePostsOnlyFromPairs filePathFrontMatter) :: MainTagIndex
+      renderAll mainTagIndex
+     else pure ()
 
 
 -- | A useful tool in making phlog indexes: create a nice link for the menu
