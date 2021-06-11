@@ -156,7 +156,7 @@ instance FromJSON FrontMatter where
     <*> (dateTime "updated" =<< (o .:? "updated"))
     <*> o .:? "title"
     <*> o .:? "author"
-    <*> (either (fail . show) pure . traverse tagList =<< (o .:? "tags" :: AT.Parser (Maybe Value)))
+    <*> ((\x -> either (fail . show) pure (traverse tagList x :: Either FrontMatterError (Maybe [T.Text]))) =<< (o .:? "tags" :: AT.Parser (Maybe Value)))
     <*> o .:? "type"
     <*> o .:? "variables"
     <*> o .:? "skipMustache"
