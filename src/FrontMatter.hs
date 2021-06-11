@@ -14,7 +14,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module FrontMatter (getFrontMatter, FrontMatter(..), FileFrontMatter) where
 
---import Text.RawString.QQ (r)
+import Errata
 import NeatInterpolation (text)
 import qualified Data.Vector as V
 import qualified Data.Dates.Parsing as DP
@@ -22,9 +22,10 @@ import qualified Data.Map as Map
 import Data.Attoparsec.ByteString ((<?>))
 import qualified Data.ByteString as ByteString
 import Data.Frontmatter (Parser, IResult(..), frontmatter, parse)
-import Data.Yaml (prettyPrintParseException, ParseException, FromJSON, parseJSON, withObject, (.:?), decodeEither', Value(..))
+import Data.Yaml (YamlException(..), YamlMark(..), ParseException(..), prettyPrintParseException, ParseException, FromJSON, parseJSON, withObject, (.:?), decodeEither', Value(..))
 import Data.Text.Encoding         as T
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 
 
 -- FIXME: not great implementation.
@@ -34,17 +35,36 @@ data FrontMatterError = FrontMatterError T.Text
 instance Show FrontMatterError where
   show (FrontMatterError t) = T.unpack t
 
+tagParseErrorErrata :: FilePath -> T.Text -> T.Text -> Errata
+tagParseErrorErrata filePath frontMatterRaw parseError = Errata
+  { errataHeader = Just "Frontmatter Tag Format Error"
+  , errataBlocks = [Block fancyRedStyle (filePath, 1, 1) Nothing [] (Just $ T.pack $ unlines . map ("| " <>) . lines $ T.unpack frontMatterRaw)]
+  , errataBody = Just parseError
+  }
+
+
+prettyPrintYamlException :: T.Text -> FilePath -> T.Text -> T.Text -> (Int, Int, Int) -> String
+prettyPrintYamlException frontMatterRaw filePath problem context (_, line, column) = do
+  let errata = Errata
+                 { errataHeader = Just "Your YAML/frontmatter is incorrect!"
+                 , errataBlocks = [Block fancyRedStyle (filePath, line+1, column + T.length context) Nothing [Pointer (line+1) column (column+1) False (Just problem)] Nothing]
+                 , errataBody = Just context
+                 }
+  TL.unpack . prettyErrors frontMatterRaw $ [errata]
+
 -- FIXME: needs to define the file the error was encountered in.
-tagParseError :: T.Text -> T.Text -> T.Text -> FrontMatterError
-tagParseError filePath frontMatter value = FrontMatterError $ [text|
-Couldn't parse frontmatter in $filePath because of incorrect JSON/YAML type for
+-- this whole thing is hacky
+tagParseError :: T.Text -> FrontMatterError
+tagParseError value = FrontMatterError $ [text|
+Couldn't parse frontmatter because of incorrect JSON/YAML type for
 "tags."
 
-You defined this frontmatter:
+The value you supplied for "tags" was parsed into this type we weren't looking
+for:
 
-  $frontMatter
+  $value.
 
-Specifically the problem is with your incorrect "tags" declaration. Instead,
+The problem is with your incorrect "tags" declaration. Instead,
 "tags" has to be either a JSON/YAML array like this:
 
   ---
@@ -57,10 +77,6 @@ Specifically the problem is with your incorrect "tags" declaration. Instead,
   tags: recipes bread
   ---
 
-The value you supplied for "tags" was parsed into this type we weren't looking
-for:
-
-  $value.
 |]
 
 
@@ -119,7 +135,6 @@ instance FromJSON FrontMatter where
     <*> (fmap (>>= dateStringToDateTime 2021) $ o .:? "updated")
     <*> o .:? "title"
     <*> o .:? "author"
-    -- TODO: for tags I want to be able to create a list out space-separated tags as well!
     <*> (either (fail . show) pure . traverse tagList =<< (o .:? "tags"))
     <*> o .:? "type"
     <*> o .:? "variables"
@@ -130,15 +145,15 @@ instance FromJSON FrontMatter where
     tagList (String text') = Right $ T.words text'
     tagList (Array array) = Right $ map (\(String text') -> text') $ V.toList array
     -- FIXME: bad error
-    tagList v = Left $ tagParseError "" "" (T.pack . show $ v)
+    tagList v = Left $ tagParseError (T.pack . show $ v)
 
 -- | The parser to be used by `parse`. Works with `FrontMatter`'s `FromJSON`
 -- instance through type inference.
 --
 -- The aeson object in the frontmatter is given an explicit type required for
 -- the parser to return anything with a FromJSON instance.
-frontmatterBurrow :: Parser FrontMatter
-frontmatterBurrow =
+frontmatterBurrow :: FilePath -> Parser FrontMatter
+frontmatterBurrow filePath =
   -- The <?> allows us to name the parser we've created with frontmatterYaml'
   -- in the event that the parser fails.
   frontmatterYaml' <?> "frontmatterBurrow"
@@ -150,7 +165,15 @@ frontmatterBurrow =
     -- `FromJSON` instance of the `FrontMatter` type because of the type singatures
     -- we supplied for this function.
     case (decodeEither' (parserByteString :: ByteString.ByteString) :: Either ParseException FrontMatter) of
-      Left parseException -> error . prettyPrintParseException $ (parseException :: ParseException)
+      Left (AesonException parseException) -> do
+        let frontMatterRaw = T.decodeUtf8 parserByteString
+            errata = TL.unpack . prettyErrors frontMatterRaw $ [tagParseErrorErrata filePath frontMatterRaw (T.pack parseException)]
+        -- NOTE: could instead just `fail errata` here to pass the error as the third part of `Fail` in `getFrontMatter`
+        error errata
+      Left (InvalidYaml (Just (YamlParseException {yamlProblem=problem, yamlContext=context, yamlProblemMark=(YamlMark indx line column)}))) -> do
+        let frontMatterRaw = T.decodeUtf8 parserByteString
+        error $ prettyPrintYamlException frontMatterRaw filePath (T.pack problem) (T.pack context) (indx, line, column)
+      Left anotherParseException -> error . prettyPrintParseException $ anotherParseException
       -- We leave the Parser monad by ending with a Parser FrontMatter, since
       -- decodeEither' will use the parseJSON method for `FrontMatter`.
       Right frontMatter -> return frontMatter:: Parser FrontMatter
@@ -158,10 +181,10 @@ frontmatterBurrow =
 
 -- | If the `FrontMatter` can be retreived, return it, along with the rest of
 -- the document with the Frontmatter removed.
-getFrontMatter :: T.Text -> (Maybe FrontMatter, T.Text)
-getFrontMatter text' = do
+getFrontMatter :: FilePath -> T.Text -> (Maybe FrontMatter, T.Text)
+getFrontMatter filePath text' = do
   let bsText = T.encodeUtf8 text'
-      result = parse frontmatterBurrow bsText :: IResult ByteString.ByteString FrontMatter
+      result = parse (frontmatterBurrow filePath) bsText :: IResult ByteString.ByteString FrontMatter
   case result of
       Done documentWithoutFrontMatter frontMatter -> (Just frontMatter, T.decodeUtf8 documentWithoutFrontMatter :: T.Text)
       -- I honestly don't understand this part. Sometimes the parser will need
@@ -169,7 +192,7 @@ getFrontMatter text' = do
       Partial f -> case (f ByteString.empty) of
                      Done ri fm -> (Just fm, T.decodeUtf8 ri)
                      Partial _ -> error "wtf"
-                     Fail _ _ errorMsg -> error errorMsg
+                     Fail _ _ _ -> error "bruh"
       -- Either a failure to parse the `FrontMatter`, or there was none!
       Fail _ _ _ -> (Nothing, text')
 

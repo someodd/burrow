@@ -206,7 +206,7 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
       -- FIXME: parseMustache should NOT load the main file by hand! we should do that
       -- so we can load frontmatter FIRST.
       fileText <- TIO.readFile (sourceDirectory ++ "/" ++ filePath)
-      let (frontMatter, restOfDocument) = getFrontMatter fileText
+      let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
           potentialTestContents = parseMustache restOfDocument recipe frontMatter :: IO T.Text
       testContents <- if fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
         then pure restOfDocument

@@ -55,6 +55,7 @@ common shared-properties
   build-depends:
     base                 >=4.7 && <5,
     text,
+    errata,
     xml-conduit-writer,
     parsec,
     data-default,
