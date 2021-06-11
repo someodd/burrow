@@ -164,15 +164,22 @@ instance FromJSON FrontMatter where
    where
     -- | Convert a parser value into a datetime object or fail!
     --
-    -- For a monadic operation inside parser.
+    -- For a monadic operation inside parser. The bind operation from (o .:? "publish")
+    -- for example puts us inside the `AT.Parser` monad and the type of "publish" expects
+    -- a `Maybe DP.DateTime` and the monad operation expects an `AT.Parser a`.
     dateTime :: T.Text -> Maybe Value -> AT.Parser (Maybe DP.DateTime)
     dateTime declaration (Just (String dateText)) =
       let v = case DP.extractDateTimesY 2021 (T.unpack dateText) of
                 [] -> Left $ dateTimeParseError declaration dateText
                 a:_ -> Right $ Just a
+      -- This line will return either a monad failure inside the `AT.Parser` monad
+      -- context, using its `MonadFail` instance, or it will simply give the
+      -- `Right` value (Just some date time) inside the AT.Parser with `pure`.
       in either (fail . show) pure v
     dateTime _ _ = pure Nothing
 
+    -- | Create a list of tags from either a space separated string of tags or
+    -- from a list of tags.
     tagList :: Value -> Either FrontMatterError [T.Text]
     tagList (String text') = Right $ T.words text'
     tagList (Array array) = Right $ map (\(String text') -> text') $ V.toList array
