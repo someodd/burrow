@@ -155,6 +155,7 @@ instance ToXML AtomFeedEntryRecipe where
 rfc3339 :: DP.DateTime -> T.Text
 rfc3339 = T.pack . HG.timePrint HG.ISO8601_DateAndTime
 
+-- FIXME: need to handle no entries.
 createAtomFeed :: AtomFeedRecipe -> XML.Document
 createAtomFeed atomFeedRecipe = do
   let phlogConfig = atomPhlogConfig atomFeedRecipe
@@ -165,13 +166,16 @@ createAtomFeed atomFeedRecipe = do
     elementA "link" [("href", T.pack $ base ++ (atomPath atomFeedRecipe)), ("rel", "self")] $ empty
     elementA "generator" [("uri", "https://github.com/hyperrealgopher/burrow")] $ content "hyperrealgopher's burrow" 
     element "id" $ content (T.pack $ base ++ (atomPath atomFeedRecipe))
-    element "updated" $ content (T.pack lastUpdated)--FIXME
+    element "updated" $ content lastUpdated--FIXME
     toXML $ AtomFeedEntryRecipe (atomEntries atomFeedRecipe) phlogConfig
     comment "that's it!"
  where
-  -- FIXME: repeats/overlap rfc3339
-  lastUpdated :: String
-  lastUpdated = HG.timePrint HG.ISO8601_DateAndTime $ maximum $ map metaUpdated $ atomEntries atomFeedRecipe
+  -- FIXME: I noticed that this indicates an error where atomEntries is empty... that should be impossible!
+  -- I think it's because of tagSummary! If tagSummary is blank.
+  lastUpdated :: T.Text
+  lastUpdated = case map metaUpdated (atomEntries atomFeedRecipe) of
+                  [] -> "n/a"-- FIXME: this is a bad way to handle this error?
+                  list -> rfc3339 $ maximum list
 
   atomDocument children = XML.Document
     { XML.documentPrologue = XML.Prologue def def def
@@ -309,7 +313,7 @@ instance PhlogIndex [PostMeta] MainTagIndex where
 
     result :: [ (Tag, [PostMeta]) ]
     result =
-      [(tag, [postMeta]) | postMeta <- postMetas, let (Just tags') = metaTags postMeta, tag <- tags']-- FIXME: what if no tags? that should error right and be just fine?
+      [(tag, [postMeta]) | postMeta <- postMetas, tag <- fromMaybe [] (metaTags postMeta)]-- FIXME: what if no tags? that should error right and be just fine?
 
   -- TODO: rewrite better
   renderIndexGophermap (MainTagIndex mainTagIndex) = do

@@ -35,12 +35,16 @@ data FrontMatterError = FrontMatterError T.Text
 instance Show FrontMatterError where
   show (FrontMatterError t) = T.unpack t
 
-tagParseErrorErrata :: FilePath -> T.Text -> T.Text -> Errata
-tagParseErrorErrata filePath frontMatterRaw parseError = Errata
-  { errataHeader = Just "Frontmatter Tag Format Error"
-  , errataBlocks = [Block fancyRedStyle (filePath, 1, 1) Nothing [] (Just $ T.pack $ unlines . map ("| " <>) . lines $ T.unpack frontMatterRaw)]
-  , errataBody = Just parseError
-  }
+
+tagParseError' :: T.Text -> FilePath -> T.Text -> String
+tagParseError' frontMatterRaw filePath parseError = do
+  TL.unpack . prettyErrors frontMatterRaw $ [
+    Errata
+      { errataHeader = Just "Frontmatter Tag Format Error"
+      , errataBlocks = [Block fancyRedStyle (filePath, 1, 1) Nothing [] (Just $ T.pack $ unlines . map ("| " <>) . lines $ T.unpack frontMatterRaw)]
+      , errataBody = Just parseError
+      }
+    ]
 
 
 prettyPrintYamlException :: T.Text -> FilePath -> T.Text -> T.Text -> (Int, Int, Int) -> String
@@ -165,11 +169,7 @@ frontmatterBurrow filePath =
     -- `FromJSON` instance of the `FrontMatter` type because of the type singatures
     -- we supplied for this function.
     case (decodeEither' (parserByteString :: ByteString.ByteString) :: Either ParseException FrontMatter) of
-      Left (AesonException parseException) -> do
-        let frontMatterRaw = T.decodeUtf8 parserByteString
-            errata = TL.unpack . prettyErrors frontMatterRaw $ [tagParseErrorErrata filePath frontMatterRaw (T.pack parseException)]
-        -- NOTE: could instead just `fail errata` here to pass the error as the third part of `Fail` in `getFrontMatter`
-        error errata
+      Left (AesonException parseException) -> error $ tagParseError' (T.decodeUtf8 parserByteString) filePath (T.pack parseException)
       Left (InvalidYaml (Just (YamlParseException {yamlProblem=problem, yamlContext=context, yamlProblemMark=(YamlMark indx line column)}))) -> do
         let frontMatterRaw = T.decodeUtf8 parserByteString
         error $ prettyPrintYamlException frontMatterRaw filePath (T.pack problem) (T.pack context) (indx, line, column)
