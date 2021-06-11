@@ -132,6 +132,8 @@ matchPartial filePath =
            _ -> Nothing
 
 
+-- FIXME: take an argument here to decide if you're going to use template or
+-- not based off frontmatter spec? loosely coupled tho just send a bool. don't use frontmatter if don't nee dmost.
 -- TODO: handle frontmatter here?
 -- | Create a `Recipe` for rendering a file.
 createRenderRecipe :: FilePath -> FilePath -> Bool -> SourceFile -> IO FileRenderRecipe
@@ -205,6 +207,7 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
       -- TODO: get and remove frontmatter here
       -- FIXME: parseMustache should NOT load the main file by hand! we should do that
       -- so we can load frontmatter FIRST.
+      -- FIXME: use frontmatter to piece together which partial to use and which renderer (gophermap or regular textfile)
       fileText <- TIO.readFile (sourceDirectory ++ "/" ++ filePath)
       let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
           potentialTestContents = parseMustache restOfDocument recipe frontMatter :: IO T.Text
