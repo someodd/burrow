@@ -47,15 +47,6 @@ tagParseError' frontMatterRaw filePath parseError = do
     ]
 
 
-prettyPrintYamlException :: T.Text -> FilePath -> T.Text -> T.Text -> (Int, Int, Int) -> String
-prettyPrintYamlException frontMatterRaw filePath problem context (_, line, column) = do
-  let errata = Errata
-                 { errataHeader = Just "Your YAML/frontmatter is incorrect!"
-                 , errataBlocks = [Block fancyRedStyle (filePath, line+1, column + T.length context) Nothing [Pointer (line+1) column (column+1) False (Just problem)] Nothing]
-                 , errataBody = Just context
-                 }
-  TL.unpack . prettyErrors frontMatterRaw $ [errata]
-
 -- FIXME: needs to define the file the error was encountered in.
 -- this whole thing is hacky
 tagParseError :: T.Text -> FrontMatterError
@@ -82,6 +73,16 @@ The problem is with your incorrect "tags" declaration. Instead,
   ---
 
 |]
+
+
+prettyPrintYamlException :: T.Text -> FilePath -> T.Text -> T.Text -> (Int, Int, Int) -> String
+prettyPrintYamlException frontMatterRaw filePath problem context (_, line, column) = do
+  let errata = Errata
+                 { errataHeader = Just "Your YAML/frontmatter is incorrect!"
+                 , errataBlocks = [Block fancyRedStyle (filePath, line+1, column + T.length context) Nothing [Pointer (line+1) column (column+1) False (Just problem)] Nothing]
+                 , errataBody = Just context
+                 }
+  TL.unpack . prettyErrors frontMatterRaw $ [errata]
 
 
 -- | A filepath and its associated filematter meta (if any).
