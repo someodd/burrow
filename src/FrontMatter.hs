@@ -19,6 +19,7 @@ import NeatInterpolation (text)
 import qualified Data.Vector as V
 import qualified Data.Dates.Parsing as DP
 import qualified Data.Map as Map
+import qualified Data.Aeson.Types as AT
 import Data.Attoparsec.ByteString ((<?>))
 import qualified Data.ByteString as ByteString
 import Data.Frontmatter (Parser, IResult(..), frontmatter, parse)
@@ -47,8 +48,24 @@ tagParseError' frontMatterRaw filePath parseError = do
     ]
 
 
+dateTimeParseError :: T.Text -> T.Text -> FrontMatterError
+dateTimeParseError declaration parseAttempt = FrontMatterError $ [text|
+There was a problem in your frontmatter!
+
+I couldn't figure out a way to create a valid date format (like ISO8601)
+out of this format you gave me for "$declaration":
+
+  $parseAttempt
+
+Suggestions:
+
+  * Try a date format like YYYY-MM-DD
+  * Just remove the "$declaration" specification altogether
+|]
+
+
 -- FIXME: needs to define the file the error was encountered in.
--- this whole thing is hacky
+-- this whole thing is hacky. Could even use mustache!
 tagParseError :: T.Text -> FrontMatterError
 tagParseError value = FrontMatterError $ [text|
 Couldn't parse frontmatter because of incorrect JSON/YAML type for
@@ -131,26 +148,37 @@ data FrontMatter = FrontMatter
   } deriving (Show)
 
 
--- FIXME: could feasibly use Reader to get the date/time if it's passed from the building
--- process! Not sure if I care that much about it.
 -- | Allows for the decoding of ByteString into the `FrontMatter` type.
 instance FromJSON FrontMatter where
   parseJSON = withObject "FrontMatter" $ \o -> FrontMatter
-    <$> (fmap (>>= dateStringToDateTime 2021) $ o .:? "published")
-    <*> (fmap (>>= dateStringToDateTime 2021) $ o .:? "updated")
+    -- FIXME: need to have a fail in the parse context here just like with tags, for if dateStringToDateTime fails!
+    <$> (dateTime "published" =<< (o .:? "published" :: AT.Parser (Maybe Value)) :: AT.Parser (Maybe DP.DateTime))
+    <*> (dateTime "updated" =<< (o .:? "updated"))
     <*> o .:? "title"
     <*> o .:? "author"
-    <*> (either (fail . show) pure . traverse tagList =<< (o .:? "tags"))
+    <*> (either (fail . show) pure . traverse tagList =<< (o .:? "tags" :: AT.Parser (Maybe Value)))
     <*> o .:? "type"
     <*> o .:? "variables"
     <*> o .:? "skipMustache"
     <*> o .:? "skipMarkdown"
    where
+    -- | Convert a parser value into a datetime object or fail!
+    --
+    -- For a monadic operation inside parser.
+    dateTime :: T.Text -> Maybe Value -> AT.Parser (Maybe DP.DateTime)
+    dateTime declaration (Just (String dateText)) =
+      let v = case DP.extractDateTimesY 2021 (T.unpack dateText) of
+                [] -> Left $ dateTimeParseError declaration dateText
+                a:_ -> Right $ Just a
+      in either (fail . show) pure v
+    dateTime _ _ = pure Nothing
+
     tagList :: Value -> Either FrontMatterError [T.Text]
     tagList (String text') = Right $ T.words text'
     tagList (Array array) = Right $ map (\(String text') -> text') $ V.toList array
     -- FIXME: bad error
     tagList v = Left $ tagParseError (T.pack . show $ v)
+
 
 -- | The parser to be used by `parse`. Works with `FrontMatter`'s `FromJSON`
 -- instance through type inference.
@@ -196,18 +224,3 @@ getFrontMatter filePath text' = do
                      Fail _ _ _ -> error "bruh"
       -- Either a failure to parse the `FrontMatter`, or there was none!
       Fail _ _ _ -> (Nothing, text')
-
-
--- FIXME: add fancy error for this and also make a part of frontmatter and automatically transform into this type?
--- remember: you don't HAVE to have a date.
--- FIXME: could error out (usage of `head`)
--- | Fuzzy match a date time string (for a `FrontMatter` date/time definition).
---
--- `extractDateTimesY` does all the heavy lifting.
---
--- >>> dateStringToDateTime (2021 :: Integer) (T.pack "july 29")
--- DateTime {dtDate = Date {dateYear = 2021, dateMonth = July, dateDay = 29}, dtTime = TimeOfDay {todHour = 0h, todMin = 0m, todSec = 0s, todNSec = 0ns}}
--- >>> dateStringToDateTime (2021 :: Integer) (T.pack "2021-06-20T04:30")
--- DateTime {dtDate = Date {dateYear = 2021, dateMonth = June, dateDay = 20}, dtTime = TimeOfDay {todHour = 0h, todMin = 0m, todSec = 0s, todNSec = 0ns}}
-dateStringToDateTime :: Integer -> T.Text -> Maybe DP.DateTime
-dateStringToDateTime defaultYear dateText = Just $ head $ DP.extractDateTimesY (fromIntegral defaultYear :: Int) (T.unpack dateText)

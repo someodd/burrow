@@ -82,6 +82,7 @@ common shared-properties
     fuzzy-dates,
     hourglass,
     raw-strings-qq,
+    aeson,
     neat-interpolation,
     yaml
 
