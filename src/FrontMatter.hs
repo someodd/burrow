@@ -133,6 +133,7 @@ data FrontMatter = FrontMatter
   -- ^ Only type supported right now is "post" if defined at all.
   -- Defining it as "post" will put it into the phlog index
   -- system defined in the `Phlog` module.
+  -- FIXME ^ should error if not recognized type? catches typos.
   , fmVariables :: Maybe (Map.Map T.Text T.Text) -- FIXME: maybe fmSubstitutions would be a better name?
   -- ^ Allows you to set Mustasche substitutions for the final rendered product.
   -- For example, if you define:
@@ -145,6 +146,11 @@ data FrontMatter = FrontMatter
   -- ^ Do not use the Mustache parser for this file (if true).
   , fmSkipMarkdown :: Maybe Bool
   -- ^ Do not use the Markdown parser for this file (if true).
+  , fmParentTemplate :: Maybe FilePath
+  -- ^ Embed the file inside another template by the path mentioned. If set,
+  -- this setting will override the setting derived from file extension name.
+  , fmRenderAs :: Maybe T.Text
+  -- ^ Can render as "file" or "menu." Overrides settings derived from file name.
   } deriving (Show)
 
 
@@ -156,11 +162,14 @@ instance FromJSON FrontMatter where
     <*> (dateTime "updated" =<< (o .:? "updated"))
     <*> o .:? "title"
     <*> o .:? "author"
+    -- Sorry for this ugly bit, I wanted to be explicit to make it more readable.
     <*> ((\x -> either (fail . show) pure (traverse tagList x :: Either FrontMatterError (Maybe [T.Text]))) =<< (o .:? "tags" :: AT.Parser (Maybe Value)))
     <*> o .:? "type"
     <*> o .:? "variables"
     <*> o .:? "skipMustache"
     <*> o .:? "skipMarkdown"
+    <*> o .:? "parentTemplate"
+    <*> o .:? "renderAs" -- FIXME: should check if belongs in list or errors...
    where
     -- | Convert a parser value into a datetime object or fail!
     --
@@ -215,6 +224,7 @@ frontmatterBurrow filePath =
       Right frontMatter -> return frontMatter:: Parser FrontMatter
 
 
+-- FIXME: should the type be Maybe (FrontMatter, T.Text)?
 -- | If the `FrontMatter` can be retreived, return it, along with the rest of
 -- the document with the Frontmatter removed.
 getFrontMatter :: FilePath -> T.Text -> (Maybe FrontMatter, T.Text)
