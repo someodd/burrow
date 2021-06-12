@@ -1,0 +1,12 @@
+---
+title: Demo Page
+renderAs: menu
+skipMustache: false
+skipMarkdown: false
+parentTemplate: menu.txt
+variables: {"variableTest": "success!"}
+---
+
+# Heading
+
+Hello, world!

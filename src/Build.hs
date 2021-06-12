@@ -32,14 +32,13 @@ import System.Directory (copyFile)
 import qualified Data.HashMap.Strict as H
 import Data.List (isSuffixOf)
 --import Data.Foldable (traverse_)
-import System.FilePath (takeDirectory, takeFileName)
+import System.FilePath (splitExtension, takeDirectory)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
 import System.Directory (createDirectoryIfMissing)
 import System.FilePattern.Directory
-import Data.List.Split (splitOn)
 import qualified Data.Map as Map
 import Commonmark hiding (addAttribute, escapeURI)
 import Text.Mustache
@@ -47,6 +46,7 @@ import qualified Text.Mustache.Types as Mtype
 
 import Control.Monad.Reader
 
+import Config
 import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter(..), getFrontMatter, FileFrontMatter)
 import TextUtils.Headings
 import Markdown
@@ -66,91 +66,76 @@ data ParseType = GopherFileType
                deriving (Show, Eq)
 
 
--- | File extensions and which Markdown parser will be used for them.
-suffixParseMap :: Map.Map ParseSuffix ParseType
-suffixParseMap = Map.fromList
-  -- FIXME: it didn't have a period to begin with
-  [ (textFileSuffix, GopherFileType)
-  , (gophermapSuffix, GopherMenuType)
-  ]
-
 -- | A relative path to a file to parse (excluding its parent-most directory)
 -- and which parser shall be used to parse it.
 --
 -- See also: `getSourceFiles`.
 type SourceFile = (FilePath, ParseType)
 
+-- FIXME: mayeb this isn't how we want to do things since we have frontmatter
 -- | Get a list of source files' file paths to be used in order to construct
 -- the gopherhole, as well as the type of parser to use to render those paths.
 getSourceFiles :: FilePath -> IO [SourceFile]
 getSourceFiles sourceDirectory = do
+  config <- getConfig
+  dontSkipThese <- fmap words $ getConfigValue config "general" "buildExtensions"
   filesMatching <- getDirectoryFiles sourceDirectory ["**/*"]
-  pure $ fmap (\x -> (x, getParseType x)) filesMatching
+  pure $ fmap (\x -> (x, getParseType dontSkipThese x)) filesMatching
+ where
+  getParseType :: [String] -> FilePath -> ParseType
+  getParseType dontSkipThese filePath
+    | any (`isSuffixOf` filePath) dontSkipMenuExtensions = GopherMenuType
+    | any (`isSuffixOf` filePath) dontSkipExtensions = GopherFileType
+    | otherwise = Skip
+   where
+     dontSkipMenuExtensions = map (".menu." ++) dontSkipThese
+     dontSkipExtensions = map ("." ++) dontSkipThese
 
 
--- | Get the appropriate ParseType for the supplied file path.
---
--- Burrow relies on the double file extension format of
--- something like *.txt.mustache.
---
--- Suffixes/extensions which are not mapped to a parser shall 
--- be marked as `Skip`.
---
--- >>> getParseType "some/path/foo/bar/filename.text.md.mustache"
--- GopherFileType
--- >>> getParseType "some/path/filename.jpg"
--- Skip
-getParseType :: FilePath -> ParseType
-getParseType filePath =
-  case fmap reverse $ splitOn "." (reverse filePath) of
-    maybeMustacheExtension:"md":maybeFileExtension:_ ->
-      let parseSuffix = "." ++ maybeFileExtension ++ ".md." ++ maybeMustacheExtension
-      in case Map.lookup parseSuffix suffixParseMap of
-           Just parseType -> parseType
-           Nothing -> Skip
-    _ -> Skip
-
-
--- | Match the "somepartial" of */*/*.somepartial.partial.*.md.mustache
---
--- Will return Nothing if doesn't use a partial or if the extension isn't
--- mapped to a Markdown parser.
---
--- >>> matchPartial "foo/bar/afile.phlogpost.partial.text.md.mustache"
--- Just ("phlogpost", ".text.md.mustache")
-matchPartial :: FilePath -> Maybe (String, String)
-matchPartial filePath =
-  case getParseType filePath of
-    Skip -> Nothing
-    _ ->
-      let filename = takeFileName filePath
-          dotSplit = reverse $ splitOn "." filename
-      in case dotSplit of
-          -- FIXME: this feels very hardcoded. Should use some of the variables for file extensions
-          -- as well as the partialExtension variable.
-           "mustache":"md":fileType:"partial":partialName:_ -> Just (partialName, "." ++ fileType ++ ".md.mustache")
-           _ -> Nothing
-
-
+-- FIXME: partials work right, nonpartials dont
+-- FIXME: giant mess! drop file extension idea altogether
 -- FIXME: take an argument here to decide if you're going to use template or
 -- not based off frontmatter spec? loosely coupled tho just send a bool. don't use frontmatter if don't nee dmost.
 -- TODO: handle frontmatter here?
 -- | Create a `Recipe` for rendering a file.
-createRenderRecipe :: FilePath -> FilePath -> Bool -> SourceFile -> IO FileRenderRecipe
-createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, parseType) =
-  case matchPartial filePath of
-    Just (templateToUse, extension) -> recipeWithPartial templateToUse extension
-    Nothing -> pure recipeWithoutPartial
+createRenderRecipe :: FilePath -> FilePath -> Bool -> SourceFile -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
+createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, parseType) = do
+  -- If the parse type isn't skip then we want...
+  if parseType == Skip
+    then pure (recipeWithoutPartial Skip, Nothing)
+    else do
+      -- FIXME: the buildExtensions part should be for the getparsetype thingy
+      -- and then we still need to define which is menu and which plain?
+      -- maybe don't use file extensions at all to specify partials an drender types.
+      --config <- getConfig
+      --fileExtensions <- fmap words $ getConfigValue "general" "buildExtensions"
+      fileText <- TIO.readFile (sourceDirectory ++ "/" ++ filePath)
+      let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
+          templateToUse = frontMatter >>= fmParentTemplate
+          renderAs = case frontMatter >>= fmRenderAs of
+                       Just renderName -> case renderName of
+                                            "menu" -> GopherMenuType
+                                            "file" -> GopherFileType
+                                            _ -> error "unsupported renderAs" -- FIXME: bad error.
+                       Nothing -> parseType
+      case templateToUse of
+        Nothing ->
+          pure (recipeWithoutPartial renderAs, frontMatter >>= \x -> Just (x, restOfDocument))
+        Just templateName ->
+          let (noExtension, extension) = splitExtension templateName
+          in pure (recipeWithPartial fileText noExtension extension renderAs, frontMatter >>= \x -> Just (x, restOfDocument))
  where
+  -- FIXME: this is all unnecessarily messy!
+  -- FIXME: rendertype vs parsetype? what?
   -- Create the recipe for a file that does not use partials.
-  recipeWithoutPartial :: FileRenderRecipe
-  recipeWithoutPartial = 
+  recipeWithoutPartial :: ParseType -> FileRenderRecipe
+  recipeWithoutPartial parseType' = 
     FileRenderRecipe
       { pfrSourceDirectory = sourceDirectory
       , pfrDestinationDirectory = destinationDirectory
       , pfrSpacecookie = spaceCookie
       , pfrTemplateToRender = filePathIncludingSourceDirectory
-      , pfrParseType = parseType
+      , pfrParseType = parseType'
       , pfrOutPath = filePath
       , pfrIncludePartial = Nothing
       , pfrSubstitutions = dataForMustache
@@ -159,25 +144,26 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
   filePathIncludingSourceDirectory :: String
   filePathIncludingSourceDirectory = sourceDirectory ++ filePath
 
+  -- FIXME: this is confusing.
   -- FIXME: Does not need to be IO, because it doesn't need to load the partial ahead of time... also
   -- shouldn't do newDataFormustache... 
   -- Create the recipe for a file that uses partials.
-  recipeWithPartial :: String -> String -> IO FileRenderRecipe
-  recipeWithPartial templateToUse extension = do
+  recipeWithPartial :: T.Text -> String -> String -> ParseType -> FileRenderRecipe
+  recipeWithPartial mainTextContents templateToUse extension parseType' = do
     let partial'sTemplatePath = "templates/" ++ templateToUse ++ extension
-    partial <- readFile filePathIncludingSourceDirectory
     -- FIXME, TODO: it feels like this is being done twice!
-    let newDataForMustache = (partialExtension, Mtype.String (T.pack partial)):dataForMustache
-    pure $ FileRenderRecipe
-             { pfrSourceDirectory = sourceDirectory
-             , pfrDestinationDirectory = destinationDirectory
-             , pfrSpacecookie = spaceCookie
-             , pfrTemplateToRender = filePathIncludingSourceDirectory
-             , pfrParseType = parseType
-             , pfrOutPath = filePath
-             , pfrIncludePartial = Just partial'sTemplatePath
-             , pfrSubstitutions = newDataForMustache
-             }
+    -- FIXME: hardcoding again
+    let newDataForMustache = ("partial", Mtype.String mainTextContents):dataForMustache
+    FileRenderRecipe
+      { pfrSourceDirectory = sourceDirectory
+      , pfrDestinationDirectory = destinationDirectory
+      , pfrSpacecookie = spaceCookie
+      , pfrTemplateToRender = filePathIncludingSourceDirectory
+      , pfrParseType = parseType'
+      , pfrOutPath = filePath
+      , pfrIncludePartial = Just partial'sTemplatePath
+      , pfrSubstitutions = newDataForMustache
+      }
 
 
 -- | FrontMatter meta that has been collected. UNUSED
@@ -189,7 +175,9 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
 -- a hook to do a bunch of stuf with accumulated frontmatter or something?
 renderFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
 renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath, parseType) = do
-  recipe <- createRenderRecipe sourceDirectory destinationDirectory spaceCookie sourceFile
+  (recipe, maybeFrontMatterAndRestOfDoc) <- createRenderRecipe sourceDirectory destinationDirectory spaceCookie sourceFile
+  --_ <- error . show $ maybeFrontMatterAndRestOfDoc
+  --_ <- error . show $ parseType
   -- TODO/FIXME: you have to implement frontmatter parsing here and pass off the modified
   -- contents, I guess! Would have to use a State I guess to write to for updating and
   -- maintaining an index to finally write out later...
@@ -204,27 +192,22 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
       _ <- noParseOut recipe
       pure (fst sourceFile, Nothing)
     else do
-      -- TODO: get and remove frontmatter here
-      -- FIXME: parseMustache should NOT load the main file by hand! we should do that
-      -- so we can load frontmatter FIRST.
-      -- FIXME: use frontmatter to piece together which partial to use and which renderer (gophermap or regular textfile)
-      fileText <- TIO.readFile (sourceDirectory ++ "/" ++ filePath)
-      let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
-          potentialTestContents = parseMustache restOfDocument recipe frontMatter :: IO T.Text
-      testContents <- if fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
-        then pure restOfDocument
-        else potentialTestContents
+      fileText <- case maybeFrontMatterAndRestOfDoc of
+                    Nothing -> TIO.readFile (sourceDirectory ++ "/" ++ filePath)
+                    Just (_, restOfDocument) -> pure restOfDocument
+      let frontMatter = maybeFrontMatterAndRestOfDoc >>= Just . fst
 
-      -- FIXME: need a function to parse the frontmatter and remove it from contents instead
-      -- right here instead of making up bogus at end
-      -- FIXME: this is writing out... that's bad! this function should handle it isntead! so
-      -- fix up the markdown function.
-      -- FIXME: should not parse markdown to file here, it should return the file contents!
+      -- FIXME: all this skipping gives me a headache to debug
+      -- could actually just chain things together (renderers) based on what's available as True
+      testContents <- if fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
+        then pure fileText
+        else parseMustache fileText recipe frontMatter :: IO T.Text
+
       let filePathToWriteTo = pfrOutPath recipe
-          potentialFinalContents = parseMarkdown recipe testContents :: IO T.Text
       finalContents <- if fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
         then pure testContents
-        else potentialFinalContents
+        else parseMarkdown recipe testContents :: IO T.Text
+
       finalFilePathToWriteTo <- finalFilePath filePathToWriteTo recipe
       writeFile finalFilePathToWriteTo (T.unpack finalContents) -- first time it's written
       pure (fst sourceFile, frontMatter)
@@ -251,6 +234,7 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
     copyFile source destination
 
 
+-- FIXME: should include "skip mustache" and "skip markdown" directives
 -- FIXME: rename all these pfr things to frr or just recipe as the prefix
 -- | All the settings for a function (`writeOutBasedOn`) to parse a file
 -- using Commonmark and Mustache.
@@ -275,9 +259,11 @@ data FileRenderRecipe = FileRenderRecipe
   -- ^ The substitutions to be used when parsing the mustache template. You can think of these
   -- as globals or putting things into scope. But it all needs to be a commonmark value: a
   -- string, a function, a partial.
-  }
+  } deriving (Show)
 
 
+-- FIXME: clean this up
+-- FIXME: mainText kinda being ignored?
 -- TODO: move to Mustache?
 -- TODO: just have a WHERE function for what happens if is partial and one for what if not
 -- TODO: the recipe record names are horrible FIXME
@@ -310,29 +296,19 @@ parseMustache mainText recipe maybeFrontMatter = do
   newPrepareTemplateUsingParent parentTemplatePath = do
     -- we are going to put mainTemplate in the template cache as a partial as "partial" for the parent template!
     mainTemplate <- automaticCompileText mainText
-    let mainTemplateCache = H.fromList [(T.unpack partialExtension, mainTemplate)] :: H.HashMap String Template
+    let mainTemplateCache = H.fromList [("partial", mainTemplate)] :: H.HashMap String Template
     parentTemplate <- compileTemplateWithCache searchSpace mainTemplateCache parentTemplatePath
     case parentTemplate of
       Left err -> error $ show err
       Right template -> pure template
-  {-  
-  prepareTemplateUsingParent :: FilePath -> IO Template
-  prepareTemplateUsingParent parentTemplatePath = do
-    --- the "parent template" here is the partial in which we insert the actual/main content into.
-    parentTemplate <- getCompiledTemplate searchSpace parentTemplatePath
-    -- Now make the main template, which we put inside parent template as the "partial."
-    let templateCache = H.insert (T.unpack partialExtension) parentTemplate (partials parentTemplate)
-    compiled' <- compileTemplateWithCache searchSpace templateCache (pfrTemplateToRender recipe)
-    case compiled' of
-      Left err -> error $ show err
-      Right template -> pure template
-  -}
 
   -- | Prepare a template normally.
   prepareTemplate :: IO Template
   prepareTemplate = do
-    mainTemplate <- getCompiledTemplate searchSpace (pfrTemplateToRender recipe)
+    mainTemplate <- automaticCompileText mainText
     pure mainTemplate
+    --mainTemplate <- getCompiledTemplate searchSpace (pfrTemplateToRender recipe)
+    --pure mainTemplate
 
 
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
@@ -390,6 +366,7 @@ parseMarkdown recipe contents =
 -- can be served via the Gopher protocol.
 buildGopherhole :: FilePath -> FilePath -> Bool -> IO ()
 buildGopherhole sourceDir destDir spaceCookie = do
+  --- FIXME: getSourceFiles needs to use the extensio directive in the ini file!
   sourceFiles <- getSourceFiles sourceDir :: IO [SourceFile]
   filePathFrontMatter <- traverse (renderFile sourceDir destDir spaceCookie) sourceFiles
   renderTagIndexes filePathFrontMatter

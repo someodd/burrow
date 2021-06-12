@@ -1,0 +1,11 @@
+{{! This is the base template for menus! }}
+
+{{> header.txt }}
+
+This menu is called "{{$title}}."
+
+{{ variableTest }}
+
+{{> partial}}
+
+{{> footer.txt }}

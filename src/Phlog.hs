@@ -24,7 +24,7 @@ import Data.Hashable (Hashable)
 import Data.Time.Calendar (toGregorian)
 import Data.Time.Clock (getCurrentTime, utctDay)
 import qualified Data.Dates.Parsing as DP
-import System.FilePath (takeDirectory)
+import System.FilePath (splitExtension, takeDirectory)
 import System.Directory (createDirectoryIfMissing)
 import Data.Foldable (traverse_)
 import Data.Maybe (fromMaybe, fromJust)
@@ -36,7 +36,6 @@ import Data.List (sortOn, intercalate, isSuffixOf)
 import qualified Data.Text as T
 
 import Config (getConfig, getConfigValue)
-import Common (gophermapSuffix, textFileSuffix)
 import FrontMatter (FileFrontMatter, FrontMatter(..), getFrontMatter)
 
 
@@ -447,15 +446,17 @@ renderTagIndexes filePathFrontMatter = do
      else pure ()
 
 
+-- FIXME
+-- UH OH NOT USING SPECIFIC SUFFIXES FOR MENUS VS REGULAR FILES RESULTS IN THIS HEADACHE!
 -- | A useful tool in making phlog indexes: create a nice link for the menu
 -- using a supplied pair from PostMetas.
 makeLocalLink :: PostMeta -> String
 makeLocalLink postMeta
-  | gophermapSuffix `isSuffixOf` path = restOfLink "1"
-  | textFileSuffix `isSuffixOf` path = restOfLink "0"
+  -- FIXME: hardcoded "menu"
+  | ".menu" `isSuffixOf` (fst . splitExtension $ path) = restOfLink "1"
   -- Otherwise we are very lazily just going to assume it's a text file. This
   -- will be improved in the future.
-  | otherwise = restOfLink "1"
+  | otherwise = restOfLink "0"
  where
   path :: FilePath
   path = T.unpack $ metaPath postMeta
