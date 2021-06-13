@@ -225,9 +225,20 @@ data FileRenderRecipe = FileRenderRecipe
 
 
 -- TODO: comments, clean up
--- | Prepares the file which needs to be parsed as a Mustache template.
+-- | Prepares the file which needs to be parsed as a Mustache template, 
+-- according to a `FileRenderRecipe`.
+--
+-- The source of this function is a bit confusing due to the fact that if we
+-- are using a parent template then we are using the main file as a partial
+-- inserted as a substitution for Mustache named "partial," where the parent
+-- template is the main that gets rendered.
 parseMustache :: T.Text -> FileRenderRecipe -> Maybe FrontMatter -> IO T.Text
 parseMustache mainText recipe maybeFrontMatter = do
+  -- The main template will be the main file in question which the recipe is
+  -- for if there's no use of parent template, but if the parent template is
+  -- used then the mainTemplate will be the parent template, with the file the
+  -- recipe is for being inserted as a Mustache substitution named "partial,"
+  -- which the main template can call as "partial."
   mainTemplate <-
     case frrIncludePartial recipe of
       Just parentTemplatePath -> newPrepareTemplateUsingParent parentTemplatePath
