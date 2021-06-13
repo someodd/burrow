@@ -1,6 +1,7 @@
 ---
 title: Demo Page
 renderAs: menu
+published: 2021-06-12
 skipMustache: false
 skipMarkdown: false
 parentTemplate: menu.txt

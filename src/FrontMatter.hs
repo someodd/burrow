@@ -12,8 +12,10 @@
 --
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
-module FrontMatter (getFrontMatter, FrontMatter(..), FileFrontMatter) where
+module FrontMatter (toVariablePairs, getFrontMatter, FrontMatter(..), FileFrontMatter) where
 
+import Data.Maybe (fromMaybe)
+import Data.Hourglass as HG
 import Errata
 import NeatInterpolation (text)
 import qualified Data.Vector as V
@@ -27,6 +29,15 @@ import Data.Yaml (YamlException(..), YamlMark(..), ParseException(..), prettyPri
 import Data.Text.Encoding         as T
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
+
+import Config (getConfig, getConfigValue)
+
+
+getConfigTime :: IO (String)
+getConfigTime = do
+  config <- getConfig
+  timeFormat <- getConfigValue config "general" "timeFormat"
+  pure $ timeFormat
 
 
 -- FIXME: not great implementation.
@@ -152,6 +163,23 @@ data FrontMatter = FrontMatter
   , fmRenderAs :: Maybe T.Text
   -- ^ Can render as "file" or "menu." Overrides settings derived from file name.
   } deriving (Show)
+
+
+-- | Create a list of pairs of (entry name, value) for all the relevant information
+-- one might want to include as a string in a template, file, or post.
+toVariablePairs :: FrontMatter -> IO [(T.Text, T.Text)]
+toVariablePairs frontMatter = do
+  timeFormat <- getConfigTime
+  let toConfigTime = T.pack . HG.timePrint timeFormat
+  pure $ foldr addVar []
+    [ ("title", fmTitle)
+    , ("tags", \x -> fmTags x >>= Just . T.intercalate ", ")
+    , ("author", fmAuthor)
+    , ("published", \x -> fmPublished x >>= Just . toConfigTime)
+    , ("updated", \x -> fmUpdated x >>= Just . toConfigTime)
+    ]
+ where
+   addVar (name, entry) acc = fromMaybe [] (entry frontMatter >>= \x -> Just [(name, x)]) ++ acc
 
 
 -- | Allows for the decoding of ByteString into the `FrontMatter` type.
