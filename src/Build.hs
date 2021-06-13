@@ -52,7 +52,6 @@ import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter(..), getFrontM
 import TextUtils.Headings
 import Markdown
 import Mustache
-import Common
 
 
 -- | The Markdown parser to use to transform Markdown files to various outputs
@@ -93,12 +92,8 @@ getSourceFiles sourceDirectory = do
      dontSkipExtensions = map ("." ++) dontSkipThese
 
 
--- FIXME: partials work right, nonpartials dont
--- FIXME: giant mess! drop file extension idea altogether
--- FIXME: take an argument here to decide if you're going to use template or
--- not based off frontmatter spec? loosely coupled tho just send a bool. don't use frontmatter if don't nee dmost.
--- TODO: handle frontmatter here?
--- | Create a `Recipe` for rendering a file.
+-- FIXME: this may result in the file being read twice.
+-- | Create a `FileRenderRecipe` for rendering a file.
 createRenderRecipe :: FilePath -> FilePath -> Bool -> SourceFile -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
 createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, parseType) = do
   let defaultRecipe = FileRenderRecipe
@@ -118,11 +113,6 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
     then
       pure (defaultRecipe, Nothing)
     else do
-      -- FIXME: the buildExtensions part should be for the getparsetype thingy
-      -- and then we still need to define which is menu and which plain?
-      -- maybe don't use file extensions at all to specify partials an drender types.
-      --config <- getConfig
-      --fileExtensions <- fmap words $ getConfigValue "general" "buildExtensions"
       fileText <- TIO.readFile (sourceDirectory ++ "/" ++ filePath)
       let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
           templateToUse = frontMatter >>= fmParentTemplate
@@ -146,7 +136,6 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
         Just templateName ->
           let partial'sTemplatePath = "templates/" ++ templateName
             -- FIXME, TODO: it feels like this is being done twice!
-            -- FIXME: hardcoding again
               newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter variablePairs
               recipe = recipeFrontMatterChanges { pfrIncludePartial = Just partial'sTemplatePath, pfrSubstitutions = newDataForMustache }
           in pure (recipe, frontMatterReturnPair frontMatter)
@@ -203,12 +192,15 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
       writeFile finalFilePathToWriteTo (T.unpack finalContents) -- first time it's written
       pure (fst sourceFile, frontMatter)
  where
+  -- FIXME: wouldn't it be better to do most of this in create recipe?
   -- | Some magic for choosing the target path to write to for files being
   -- parsed. This is because of the .gopherpath/directory index behavior.
   finalFilePath :: FilePath -> FileRenderRecipe -> IO FilePath
   finalFilePath filePath' recipe = do
+    config <- getConfig
+    indexName <- getConfigValue config "general" "directoryMapName"
     let outPath =
-          if (pfrSpacecookie recipe) && spacecookieGophermapName `isSuffixOf` filePath'
+          if (pfrSpacecookie recipe) && indexName `isSuffixOf` filePath'
             then let x = (takeDirectory $ pfrDestinationDirectory recipe ++ filePath') in x ++ "/.gophermap"
             else pfrDestinationDirectory recipe ++ filePath'
         directory = takeDirectory $ pfrDestinationDirectory recipe ++ (pfrOutPath recipe)
