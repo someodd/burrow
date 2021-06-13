@@ -285,12 +285,6 @@ parseMarkdown recipe contents =
   -- When used needs to specify the type. 
   parseCommonmark testContents' = commonmarkWith defaultSyntaxSpec "test" testContents'
 
-  -- Write text to the target/built directory, creating directories in the process if needed.
-  -- Will also write out to the file name .gophermap if the input file name matched spacecookieGophermapName.
-  writeOut :: T.Text -> IO T.Text
-  writeOut text = do
-     pure text
-
   -- Parse the contents as a text file for gopherspace and write out to the target directory.
   parseOutGopherFile :: IO T.Text
   parseOutGopherFile = do
@@ -301,7 +295,7 @@ parseMarkdown recipe contents =
         allTheAsciiFonts <- getAsciiFonts
         let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = blankInlineOverrides }
         let (GopherFile out') = runReader penv env
-        writeOut out'
+        pure out'
 
   -- Parse the contents as a Gopher menu/gophermap for gopherspace and write out to the target directory.
   parseOutGopherMenu :: IO T.Text
@@ -315,7 +309,7 @@ parseMarkdown recipe contents =
         let inlineOverrides = InlineOverrides { overrideLink = Just createGopherMenuLink }
         let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = inlineOverrides }
         let (GopherFile out') = runReader penv env
-        writeOut out'
+        pure out'
 
 
 -- | The exposed function to parse and copy a directory's files out to a new directory which
