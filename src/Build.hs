@@ -125,7 +125,7 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
                        Nothing -> parseType
       variablePairs <- traverse toVariablePairs frontMatter
       let recipeFrontMatterChanges = defaultRecipe
-            { frrSubstitutions = dataForMustacheWithFrontmatter variablePairs
+            { frrSubstitutions = dataForMustacheWithFrontmatter frontMatter variablePairs
             , frrParseType = renderAs
             , frrSkipMustache = fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
             , frrSkipMarkdown = fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
@@ -137,13 +137,15 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
         Just templateName ->
           let partial'sTemplatePath = "templates/" ++ templateName
             -- FIXME, TODO: it feels like this is being done twice!
-              newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter variablePairs
+              newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter frontMatter variablePairs
               recipe = recipeFrontMatterChanges { frrIncludePartial = Just partial'sTemplatePath, frrSubstitutions = newDataForMustache }
           in pure (recipe, frontMatterReturnPair frontMatter)
  where
-  dataForMustacheWithFrontmatter :: Maybe [(T.Text, T.Text)] -> [(T.Text, Mtype.Value)]
-  dataForMustacheWithFrontmatter variablePairs =
-    fromMaybe [] (variablePairs >>= Just . map (id . fst &&& Mtype.String . snd)) ++ dataForMustache
+  dataForMustacheWithFrontmatter :: Maybe FrontMatter -> Maybe [(T.Text, T.Text)] -> [(T.Text, Mtype.Value)]
+  dataForMustacheWithFrontmatter maybeFrontMatter variablePairs =
+    let hardcodedFrontMatterVars = fromMaybe [] (variablePairs >>= Just . map (id . fst &&& Mtype.String . snd)) ++ dataForMustache
+        userFrontMatterVars = fromMaybe [] ( maybeFrontMatter >>= \fm -> fmap (Map.toList . Map.map (Mtype.String)) $ fmVariables fm ) :: [(T.Text, Mtype.Value)]
+    in hardcodedFrontMatterVars ++ userFrontMatterVars
 
   -- | Some magic for choosing the target path to write to for the file being
   -- parsed. This is because of the .gopherpath/directory index behavior.
@@ -173,7 +175,7 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
 
       testContents <- if frrSkipMustache recipe
         then pure fileText
-        else parseMustache fileText recipe frontMatter :: IO T.Text
+        else parseMustache fileText recipe :: IO T.Text
 
       finalContents <- if frrSkipMarkdown recipe
         then pure testContents
@@ -224,7 +226,6 @@ data FileRenderRecipe = FileRenderRecipe
   } deriving (Show)
 
 
--- TODO: comments, clean up
 -- | Prepares the file which needs to be parsed as a Mustache template, 
 -- according to a `FileRenderRecipe`.
 --
@@ -232,8 +233,8 @@ data FileRenderRecipe = FileRenderRecipe
 -- are using a parent template then we are using the main file as a partial
 -- inserted as a substitution for Mustache named "partial," where the parent
 -- template is the main that gets rendered.
-parseMustache :: T.Text -> FileRenderRecipe -> Maybe FrontMatter -> IO T.Text
-parseMustache mainText recipe maybeFrontMatter = do
+parseMustache :: T.Text -> FileRenderRecipe -> IO T.Text
+parseMustache mainText recipe = do
   -- The main template will be the main file in question which the recipe is
   -- for if there's no use of parent template, but if the parent template is
   -- used then the mainTemplate will be the parent template, with the file the
@@ -243,12 +244,12 @@ parseMustache mainText recipe maybeFrontMatter = do
     case frrIncludePartial recipe of
       Just parentTemplatePath -> newPrepareTemplateUsingParent parentTemplatePath
       Nothing -> prepareTemplate
-  let fmSubs = fromMaybe [] ( maybeFrontMatter >>= \fm -> fmap (Map.toList . Map.map (Mtype.String)) $ fmVariables fm ) :: [(T.Text, Mtype.Value)]
-  let k = Map.fromList (frrSubstitutions recipe ++ fmSubs) :: Map.Map T.Text Mtype.Value
-      testContents = substitute mainTemplate k
-  pure testContents
+  pure $ substitute mainTemplate $ (Map.fromList $ frrSubstitutions recipe :: Map.Map T.Text Mtype.Value)
  where
-  -- | Prepare a template which will insert itself inside a parent template. Lots of partia magic.
+  -- | Prepare a template which will insert itself inside a parent template.
+  --
+  -- Performs a substitution operation for "partial" (in order to put the file
+  -- the recipe is for inside of the specified parent template).
   newPrepareTemplateUsingParent :: FilePath -> IO Template
   newPrepareTemplateUsingParent parentTemplatePath = do
     -- we are going to put mainTemplate in the template cache as a partial as "partial" for the parent template!
