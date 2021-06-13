@@ -96,17 +96,18 @@ getSourceFiles sourceDirectory = do
 -- | Create a `FileRenderRecipe` for rendering a file.
 createRenderRecipe :: FilePath -> FilePath -> Bool -> SourceFile -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
 createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, parseType) = do
+  outPath <- finalFilePath
   let defaultRecipe = FileRenderRecipe
-        { pfrSourceDirectory = sourceDirectory
-        , pfrDestinationDirectory = destinationDirectory
-        , pfrSpacecookie = spaceCookie
-        , pfrTemplateToRender = sourceDirectory ++ filePath
-        , pfrParseType = parseType
-        , pfrOutPath = filePath
-        , pfrIncludePartial = Nothing
-        , pfrSubstitutions = dataForMustache
-        , pfrSkipMustache = False
-        , pfrSkipMarkdown = False
+        { frrSourceDirectory = sourceDirectory
+        , frrDestinationDirectory = destinationDirectory
+        , frrSpacecookie = spaceCookie
+        , frrTemplateToRender = sourceDirectory ++ filePath
+        , frrParseType = parseType
+        , frrOutPath = outPath
+        , frrIncludePartial = Nothing
+        , frrSubstitutions = dataForMustache
+        , frrSkipMustache = False
+        , frrSkipMarkdown = False
         }
 
   if parseType == Skip
@@ -124,10 +125,10 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
                        Nothing -> parseType
       variablePairs <- traverse toVariablePairs frontMatter
       let recipeFrontMatterChanges = defaultRecipe
-            { pfrSubstitutions = dataForMustacheWithFrontmatter variablePairs
-            , pfrParseType = renderAs
-            , pfrSkipMustache = fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
-            , pfrSkipMarkdown = fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
+            { frrSubstitutions = dataForMustacheWithFrontmatter variablePairs
+            , frrParseType = renderAs
+            , frrSkipMustache = fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
+            , frrSkipMarkdown = fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
             }
           frontMatterReturnPair = (>>= Just . flip (,) restOfDocument)
       case templateToUse of
@@ -137,35 +138,29 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
           let partial'sTemplatePath = "templates/" ++ templateName
             -- FIXME, TODO: it feels like this is being done twice!
               newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter variablePairs
-              recipe = recipeFrontMatterChanges { pfrIncludePartial = Just partial'sTemplatePath, pfrSubstitutions = newDataForMustache }
+              recipe = recipeFrontMatterChanges { frrIncludePartial = Just partial'sTemplatePath, frrSubstitutions = newDataForMustache }
           in pure (recipe, frontMatterReturnPair frontMatter)
  where
   dataForMustacheWithFrontmatter :: Maybe [(T.Text, T.Text)] -> [(T.Text, Mtype.Value)]
   dataForMustacheWithFrontmatter variablePairs =
     fromMaybe [] (variablePairs >>= Just . map (id . fst &&& Mtype.String . snd)) ++ dataForMustache
 
+  -- | Some magic for choosing the target path to write to for the file being
+  -- parsed. This is because of the .gopherpath/directory index behavior.
+  finalFilePath :: IO FilePath
+  finalFilePath = do
+    config <- getConfig
+    indexName <- getConfigValue config "general" "directoryMapName"
+    let outPath =
+          if spaceCookie && indexName `isSuffixOf` filePath
+            then let x = (takeDirectory $ destinationDirectory ++ filePath) in x ++ "/.gophermap"
+            else destinationDirectory ++ filePath
+    pure outPath
 
--- | FrontMatter meta that has been collected. UNUSED
---type CollectedMeta = [FrontMatter]
 
--- TODO: docs
--- NOTE: a good place to add hooks?
--- TODO: return index/state? the tag index can be expanded to a more general crawler later to have
--- a hook to do a bunch of stuf with accumulated frontmatter or something?
 renderFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
 renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath, parseType) = do
   (recipe, maybeFrontMatterAndRestOfDoc) <- createRenderRecipe sourceDirectory destinationDirectory spaceCookie sourceFile
-  --_ <- error . show $ maybeFrontMatterAndRestOfDoc
-  --_ <- error . show $ parseType
-  -- TODO/FIXME: you have to implement frontmatter parsing here and pass off the modified
-  -- contents, I guess! Would have to use a State I guess to write to for updating and
-  -- maintaining an index to finally write out later...
-  --
-  -- You could just append to an index file!
-  -- FIXME: this is broken, because mustache stuff honestly should just be a subset function
-  -- of parseMarkdown. Because we only run Mustache on markdown files! This will break
-  -- if the input file is something other than a source file which can be located in
-  -- the getParseType map.
   if parseType == Skip
     then do
       _ <- noParseOut recipe
@@ -176,108 +171,72 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
                     Just (_, restOfDocument) -> pure restOfDocument
       let frontMatter = maybeFrontMatterAndRestOfDoc >>= Just . fst
 
-      -- FIXME use pfr isntead
-      -- FIXME: all this skipping gives me a headache to debug
-      -- could actually just chain things together (renderers) based on what's available as True
-      testContents <- if pfrSkipMustache recipe
+      testContents <- if frrSkipMustache recipe
         then pure fileText
         else parseMustache fileText recipe frontMatter :: IO T.Text
 
-      finalContents <- if pfrSkipMarkdown recipe
+      finalContents <- if frrSkipMarkdown recipe
         then pure testContents
         else parseMarkdown recipe testContents :: IO T.Text
 
-      let filePathToWriteTo = pfrOutPath recipe
-      finalFilePathToWriteTo <- finalFilePath filePathToWriteTo recipe
-      writeFile finalFilePathToWriteTo (T.unpack finalContents) -- first time it's written
+      let filePathToWriteTo = frrOutPath recipe
+      createDirectoryIfMissing True (takeDirectory filePathToWriteTo)
+      writeFile filePathToWriteTo (T.unpack finalContents) -- first time it's written
       pure (fst sourceFile, frontMatter)
  where
-  -- FIXME: wouldn't it be better to do most of this in create recipe?
-  -- | Some magic for choosing the target path to write to for files being
-  -- parsed. This is because of the .gopherpath/directory index behavior.
-  finalFilePath :: FilePath -> FileRenderRecipe -> IO FilePath
-  finalFilePath filePath' recipe = do
-    config <- getConfig
-    indexName <- getConfigValue config "general" "directoryMapName"
-    let outPath =
-          if (pfrSpacecookie recipe) && indexName `isSuffixOf` filePath'
-            then let x = (takeDirectory $ pfrDestinationDirectory recipe ++ filePath') in x ++ "/.gophermap"
-            else pfrDestinationDirectory recipe ++ filePath'
-        directory = takeDirectory $ pfrDestinationDirectory recipe ++ (pfrOutPath recipe)
-    createDirectoryIfMissing True directory
-    pure outPath
-
   -- Don't parse; just copy the file to the target directory.
   noParseOut :: FileRenderRecipe -> IO ()
   noParseOut recipe = do
-    let destination = pfrDestinationDirectory recipe ++ filePath
+    let destination = frrDestinationDirectory recipe ++ filePath
         destinationDirectory' = takeDirectory destination
-        source = pfrSourceDirectory recipe ++ filePath
-    createDirectoryIfMissing True destinationDirectory'-- FIXME: is this any different than toplevel destinationDirectory?
+        source = frrSourceDirectory recipe ++ filePath
+    createDirectoryIfMissing True destinationDirectory'
     copyFile source destination
 
 
--- FIXME: should include "skip mustache" and "skip markdown" directives
--- FIXME: rename all these pfr things to frr or just recipe as the prefix
 -- | All the settings for a function (`writeOutBasedOn`) to parse a file
 -- using Commonmark and Mustache.
 data FileRenderRecipe = FileRenderRecipe
-  { pfrSourceDirectory :: FilePath
+  { frrSourceDirectory :: FilePath
   -- ^ The directory which the main file is from.
-  , pfrDestinationDirectory :: FilePath
+  , frrDestinationDirectory :: FilePath
   -- ^ The directory where the file will be going.
-  , pfrSpacecookie :: Bool
+  , frrSpacecookie :: Bool
   -- ^ If True, turn on the spacecookie behavior.
-  , pfrTemplateToRender :: FilePath
-  -- ^ This is the path to the main file to parse, unless a partial is specified (pfrIncludePartial). In the case
+  , frrTemplateToRender :: FilePath
+  -- ^ This is the path to the main file to parse, unless a partial is specified (frrIncludePartial). In the case
   -- a partial is specified, this is the path to the template/ partial file.
-  , pfrParseType :: ParseType
+  , frrParseType :: ParseType
   -- ^ Which parser to use.
-  , pfrOutPath :: FilePath
+  , frrOutPath :: FilePath
   -- ^ Where the parsed file shall be written out to.
-  , pfrIncludePartial :: Maybe FilePath
+  , frrIncludePartial :: Maybe FilePath
   -- ^ If a partial is being used, the main file to be parsed is instead specified here,
   -- so it may be loaded as a partial named "partial" in the template/.
-  , pfrSubstitutions :: [(T.Text, Mtype.Value)]
+  , frrSubstitutions :: [(T.Text, Mtype.Value)]
   -- ^ The substitutions to be used when parsing the mustache template. You can think of these
   -- as globals or putting things into scope. But it all needs to be a commonmark value: a
   -- string, a function, a partial.
-  , pfrSkipMustache :: Bool
+  , frrSkipMustache :: Bool
   -- ^ If True will skip the Mustache rendering process.
-  , pfrSkipMarkdown :: Bool
+  , frrSkipMarkdown :: Bool
   -- ^ If True will skip the Markdown rendering process.
   } deriving (Show)
 
 
--- FIXME: clean this up
--- FIXME: mainText kinda being ignored?
--- TODO: move to Mustache?
--- TODO: just have a WHERE function for what happens if is partial and one for what if not
--- TODO: the recipe record names are horrible FIXME
--- TODO: this is hard to understand
--- TODO: don't load main file here. you wanna load frontmatter FIRST before using this function and use frontmatter to insert into recipe which should have a Maybe FrontMater part?
--- TODO: prepareTemplate = do
+-- TODO: comments, clean up
 -- | Prepares the file which needs to be parsed as a Mustache template.
 parseMustache :: T.Text -> FileRenderRecipe -> Maybe FrontMatter -> IO T.Text
 parseMustache mainText recipe maybeFrontMatter = do
-  -- TODO: insert global substitutions from frontmatter, also add frontmatter to recipe prior?
   mainTemplate <-
-    case pfrIncludePartial recipe of
+    case frrIncludePartial recipe of
       Just parentTemplatePath -> newPrepareTemplateUsingParent parentTemplatePath
       Nothing -> prepareTemplate
-  -- could put this in the prepareTemplate?
-  -- should put this stuff in Mustache
-  -- FIXME: what's happening here?!
   let fmSubs = fromMaybe [] ( maybeFrontMatter >>= \fm -> fmap (Map.toList . Map.map (Mtype.String)) $ fmVariables fm ) :: [(T.Text, Mtype.Value)]
-  let k = Map.fromList (pfrSubstitutions recipe ++ fmSubs) :: Map.Map T.Text Mtype.Value
-      -- where is this substitute function coming from?! is it commonmark to preform the partial substitution?
+  let k = Map.fromList (frrSubstitutions recipe ++ fmSubs) :: Map.Map T.Text Mtype.Value
       testContents = substitute mainTemplate k
-      -- also i wish i could do the partial subs... shouldn't that be easy, actually?
   pure testContents
- -- FIXME: can use substitute to replace partials!
  where
-  -- the way you use `partials` here is interesting (the function) this may aid in using the text
-  -- parser version TODO FIXME
   -- | Prepare a template which will insert itself inside a parent template. Lots of partia magic.
   newPrepareTemplateUsingParent :: FilePath -> IO Template
   newPrepareTemplateUsingParent parentTemplatePath = do
@@ -294,14 +253,12 @@ parseMustache mainText recipe maybeFrontMatter = do
   prepareTemplate = do
     mainTemplate <- automaticCompileText mainText
     pure mainTemplate
-    --mainTemplate <- getCompiledTemplate searchSpace (pfrTemplateToRender recipe)
-    --pure mainTemplate
 
 
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
 parseMarkdown :: FileRenderRecipe -> T.Text -> IO T.Text
 parseMarkdown recipe contents =
-  case pfrParseType recipe of
+  case frrParseType recipe of
     -- NOTE: The way this type is setup seems redundant/adds extra maintenence just use a sumtype like ParseType = GopherFile | GopherMenu? FIXME/NOTE/TODO
     -- Parse the markdown text out as a text file to be served in gopherspace.
     GopherFileType -> do
