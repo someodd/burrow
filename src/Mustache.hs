@@ -9,7 +9,6 @@ module Mustache
 
 import qualified Data.Text as T
 
---import Control.Arrow ((&&&))
 import qualified Data.HashMap.Strict as H
 import Text.Mustache.Compile
 import Text.Mustache
@@ -25,7 +24,6 @@ searchSpace :: [FilePath]
 searchSpace = ["./templates", "."]
 
 
--- FIXME: doesn't parse partials!
 -- | This is like `automaticCompile`, except we use `Text`.
 --
 -- Based of the documentation in Text.Mustache.Compile:
@@ -42,11 +40,6 @@ automaticCompileText templateToRenderText = do
   template <- compileTemplate'
   let [t] = template
   pure t
-  {-
-  case template of
-    Left err -> error $ show err
-    Right template' -> pure template'
-  -}
  where
   compileTemplate' = do
     let mainPartialAST =
@@ -57,15 +50,6 @@ automaticCompileText templateToRenderText = do
     partialTemplates <- traverse (getCompiledTemplate searchSpace) partials'
     let templateCache = H.fromList (zip partials' partialTemplates)
     pure $ fmap (flip (Template "partial") templateCache) [mainPartialAST]
-
-
-{-
-let templateCache = H.insert (T.unpack partialExtension) secondaryTemplate (partials secondaryTemplate)
-compiled' <- compileTemplateWithCache searchSpace templateCache (pfrTemplateToRender recipe')
-case compiled' of
-  Left err -> error $ show err
-  Right template -> pure template
--}
 
 
 -- FIXME: what is this even?!

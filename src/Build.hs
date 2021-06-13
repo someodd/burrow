@@ -1,8 +1,5 @@
--- FIXME/TODO: this could be organized in a more obvious and simple manner...
 -- FIXME: maybe use the filepath library to ensure slashes in the right place, for consistency, avoiding terrible bugs
--- FIXME: there needs to be a consistent name for the Burrow partial/template system.
--- FIXME: make note that all parseable files must be some kind of *.mustache?
--- TODO: note that the partial template used must match the type/extension of the
+-- FIXME: there needs to be a consistent name for the Burrow partial/template system: parentTemplate.
 -- actual file being parsed which uses the parser.
 {-# LANGUAGE OverloadedStrings          #-}
 {-
@@ -11,16 +8,9 @@
  easier to manage.
 
  This module requires a general understanding of the Mustache package and langauge.
- Knowing Commonmark helps, too. I also am copying the Jekyll implementation of
- "frontmatter" in order to implement tags for the time being.
+ Knowing Commonmark helps, too. I also am using the Jekyll specification of
+ "frontmatter."
 
- Terms:
-
-   * Source file: a file from the source directory, which will be used to build
-     the gopherhole.
-   * Parser: something that can convert a source file to a new output format.
-   * Render: to parse a file a source file to its final form to be used in the
-     gopherhole.
 -}
 module Build 
   ( buildGopherhole
