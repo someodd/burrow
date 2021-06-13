@@ -86,8 +86,7 @@ getCompiledTemplate searchSpace' templateToRenderPath = do
 -- the Burrow template/partial system.
 dataForMustache :: [(T.Text, Mtype.Value)]
 dataForMustache =
-  [ ("title", Mtype.String "My Gopherhole")
-  , ("justify2", overText justify2)
+  [ ("justify2", overText justify2)
   , ("justify", overText justify')
   , ("columnate2", overText columnate2)
   ]
