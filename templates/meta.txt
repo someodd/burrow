@@ -2,3 +2,4 @@
 Posted: {{ published }}
 Updated: {{ updated }}
 Author: {{ author }}
+Tags: {{ tags }}

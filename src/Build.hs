@@ -32,8 +32,7 @@ import Data.Maybe (fromMaybe)
 import System.Directory (copyFile)
 import qualified Data.HashMap.Strict as H
 import Data.List (isSuffixOf)
---import Data.Foldable (traverse_)
-import System.FilePath (splitExtension, takeDirectory)
+import System.FilePath (takeDirectory)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -102,9 +101,22 @@ getSourceFiles sourceDirectory = do
 -- | Create a `Recipe` for rendering a file.
 createRenderRecipe :: FilePath -> FilePath -> Bool -> SourceFile -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
 createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, parseType) = do
-  -- If the parse type isn't skip then we want...
+  let defaultRecipe = FileRenderRecipe
+        { pfrSourceDirectory = sourceDirectory
+        , pfrDestinationDirectory = destinationDirectory
+        , pfrSpacecookie = spaceCookie
+        , pfrTemplateToRender = sourceDirectory ++ filePath
+        , pfrParseType = parseType
+        , pfrOutPath = filePath
+        , pfrIncludePartial = Nothing
+        , pfrSubstitutions = dataForMustache
+        , pfrSkipMustache = False
+        , pfrSkipMarkdown = False
+        }
+
   if parseType == Skip
-    then pure (recipeWithoutPartial Nothing Nothing Skip, Nothing)
+    then
+      pure (defaultRecipe, Nothing)
     else do
       -- FIXME: the buildExtensions part should be for the getparsetype thingy
       -- and then we still need to define which is menu and which plain?
@@ -121,56 +133,27 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
                                             _ -> error "unsupported renderAs" -- FIXME: bad error.
                        Nothing -> parseType
       variablePairs <- traverse toVariablePairs frontMatter
+      let recipeFrontMatterChanges = defaultRecipe
+            { pfrSubstitutions = dataForMustacheWithFrontmatter variablePairs
+            , pfrParseType = renderAs
+            , pfrSkipMustache = fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
+            , pfrSkipMarkdown = fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
+            }
+          frontMatterReturnPair = (>>= Just . flip (,) restOfDocument)
       case templateToUse of
         Nothing ->
-          pure (recipeWithoutPartial variablePairs frontMatter renderAs, frontMatter >>= \x -> Just (x, restOfDocument))
+          pure (recipeFrontMatterChanges, frontMatterReturnPair frontMatter)
         Just templateName ->
-          let (noExtension, extension) = splitExtension templateName
-          in pure (recipeWithPartial variablePairs frontMatter fileText noExtension extension renderAs, frontMatter >>= \x -> Just (x, restOfDocument))
+          let partial'sTemplatePath = "templates/" ++ templateName
+            -- FIXME, TODO: it feels like this is being done twice!
+            -- FIXME: hardcoding again
+              newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter variablePairs
+              recipe = recipeFrontMatterChanges { pfrIncludePartial = Just partial'sTemplatePath, pfrSubstitutions = newDataForMustache }
+          in pure (recipe, frontMatterReturnPair frontMatter)
  where
-  -- THIS ALL BECAME A MESS AGAIN.. the passing of frontmatter and variable pairs...
-  defaultRecipe :: Maybe [(T.Text, T.Text)] -> Maybe FrontMatter -> FileRenderRecipe
-  defaultRecipe variablePairs frontMatter = FileRenderRecipe
-    { pfrSourceDirectory = sourceDirectory
-    , pfrDestinationDirectory = destinationDirectory
-    , pfrSpacecookie = spaceCookie
-    , pfrTemplateToRender = filePathIncludingSourceDirectory
-    , pfrParseType = parseType
-    , pfrOutPath = filePath
-    , pfrIncludePartial = Nothing
-    , pfrSubstitutions = dataForMustacheWithFrontmatter variablePairs
-    , pfrSkipMustache = fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
-    , pfrSkipMarkdown = fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
-    }
-
   dataForMustacheWithFrontmatter :: Maybe [(T.Text, T.Text)] -> [(T.Text, Mtype.Value)]
   dataForMustacheWithFrontmatter variablePairs =
     fromMaybe [] (variablePairs >>= Just . map (id . fst &&& Mtype.String . snd)) ++ dataForMustache
-
-  -- FIXME: this is all unnecessarily messy!
-  -- FIXME: rendertype vs parsetype? what?
-  -- Create the recipe for a file that does not use partials.
-  recipeWithoutPartial :: Maybe [(T.Text, T.Text)] -> Maybe FrontMatter -> ParseType -> FileRenderRecipe
-  recipeWithoutPartial variablePairs frontMatter parseType' = (defaultRecipe variablePairs frontMatter) { pfrParseType = parseType' }
-
-  filePathIncludingSourceDirectory :: String
-  filePathIncludingSourceDirectory = sourceDirectory ++ filePath
-
-  -- FIXME: this is confusing.
-  -- FIXME: Does not need to be IO, because it doesn't need to load the partial ahead of time... also
-  -- shouldn't do newDataFormustache... 
-  -- Create the recipe for a file that uses partials.
-  recipeWithPartial :: Maybe [(T.Text, T.Text)] -> Maybe FrontMatter -> T.Text -> String -> String -> ParseType -> FileRenderRecipe
-  recipeWithPartial variablePairs frontMatter mainTextContents templateToUse extension parseType' =
-    let partial'sTemplatePath = "templates/" ++ templateToUse ++ extension
-      -- FIXME, TODO: it feels like this is being done twice!
-      -- FIXME: hardcoding again
-        newDataForMustache = ("partial", Mtype.String mainTextContents):dataForMustacheWithFrontmatter variablePairs
-    in (defaultRecipe variablePairs frontMatter)
-         { pfrParseType = parseType'
-         , pfrIncludePartial = Just partial'sTemplatePath
-         , pfrSubstitutions = newDataForMustache
-         }
 
 
 -- | FrontMatter meta that has been collected. UNUSED
