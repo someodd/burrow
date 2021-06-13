@@ -252,9 +252,9 @@ frontmatterBurrow filePath =
       Right frontMatter -> return frontMatter:: Parser FrontMatter
 
 
--- FIXME: should the type be Maybe (FrontMatter, T.Text)?
 -- | If the `FrontMatter` can be retreived, return it, along with the rest of
--- the document with the Frontmatter removed.
+-- the document with the Frontmatter removed. If there was no frontmatter
+-- the document is returned as the second item in the pair, still.
 getFrontMatter :: FilePath -> T.Text -> (Maybe FrontMatter, T.Text)
 getFrontMatter filePath text' = do
   let bsText = T.encodeUtf8 text'
