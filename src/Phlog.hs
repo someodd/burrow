@@ -39,6 +39,11 @@ import Config (getConfig, getConfigValue)
 import FrontMatter (FileFrontMatter, FrontMatter(..), getFrontMatter)
 
 
+-- | The Atom spec wants rfc3339 (ISO8601 as far as I can tell) datetime strings.
+toRFC3339 :: DP.DateTime -> T.Text
+toRFC3339 = T.pack . HG.timePrint HG.ISO8601_DateAndTime
+
+
 -- | This is like `FrontMatter`, except blog posts require certain metadata,
 -- largely to be indexed properly, to be sortable, and to be capable of being
 -- put into atom/feed format.
@@ -147,12 +152,9 @@ instance ToXML AtomFeedEntryRecipe where
        element "id" $ content postURI
        element "author" $ element "name" $ content (T.pack $ phlogDefaultAuthor phlogConfig)
        fromMaybe empty (metaTags postMeta >>= \t -> Just $ elementA "category" [("term", T.intercalate " " t)] empty)
-       element "published" $ content (rfc3339 $ metaPublished postMeta)
-       element "updated" $ content (rfc3339 $ metaUpdated postMeta)
+       element "published" $ content (toRFC3339 $ metaPublished postMeta)
+       element "updated" $ content (toRFC3339 $ metaUpdated postMeta)
 
--- | The Atom spec wants rfc3339 (ISO8601 as far as I can tell) datetime strings.
-rfc3339 :: DP.DateTime -> T.Text
-rfc3339 = T.pack . HG.timePrint HG.ISO8601_DateAndTime
 
 -- FIXME: need to handle no entries.
 createAtomFeed :: AtomFeedRecipe -> XML.Document
@@ -174,7 +176,7 @@ createAtomFeed atomFeedRecipe = do
   lastUpdated :: T.Text
   lastUpdated = case map metaUpdated (atomEntries atomFeedRecipe) of
                   [] -> "n/a"-- FIXME: this is a bad way to handle this error?
-                  list -> rfc3339 $ maximum list
+                  list -> toRFC3339 $ maximum list
 
   atomDocument children = XML.Document
     { XML.documentPrologue = XML.Prologue def def def
@@ -446,7 +448,7 @@ renderTagIndexes filePathFrontMatter = do
      else pure ()
 
 
--- FIXME
+-- FIXME: pass the menu suffix here (file extension)
 -- UH OH NOT USING SPECIFIC SUFFIXES FOR MENUS VS REGULAR FILES RESULTS IN THIS HEADACHE!
 -- | A useful tool in making phlog indexes: create a nice link for the menu
 -- using a supplied pair from PostMetas.
