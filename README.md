@@ -20,7 +20,7 @@ Written in Haskell. If you're looking for very similar software, with coincident
 
 Here's an example of various front matter entries specifically supported by Burrow:
 
-```frontmatter
+```markdown
 ---
 published: 2021-06-01T05:44
 updated: June 13th at 10pm
