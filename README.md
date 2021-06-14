@@ -67,7 +67,7 @@ This software has primarily been tested with
 You may want to look at [my spacecookie Docker
 repo](https://github.com/hyperrealgopher/docker-spacecookie). Currently, Burrow relies heavily on the `.gophermap` behavior outlined in these documents:
 
-* [spacecookie-gophermap(5)](https://github.com/sternenseemann/spacecookie/blob/master/docs/man/spacecookie-gophermap.5)
+* [spacecookie.gophermap(5)](https://sternenseemann.github.io/spacecookie/spacecookie.json.5.html)
 * [Bucktooth's gophermap tutorial](http://gopher.floodgap.com/gopher/gw.lite?=gopher.floodgap.com+70+302f6275636b2f6462726f7773653f666171757365203161)
 * [Bucktooth](http://gopher.floodgap.com/gopher/gw.lite?=gopher.floodgap.com+70+312f6275636b).
 * [pygopherd(8)](https://manpages.debian.org/unstable/pygopherd/pygopherd.8.en.html)
