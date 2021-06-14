@@ -109,6 +109,8 @@ renderAs: menu
 
 This is an example phlog post.
 
+{{ someVariable }}
+
 ## Columnate Example
 
 {{#columnate2}}
@@ -139,6 +141,8 @@ Author: Hyperreal Gopher
 Tags: foo, bar
 
 This is an example phlog post.
+
+Some text to replace someVariable
 
 ═════════════════════════════════════════════════════════════════════════════════════
 █████████████████████████████████████████████████████████████████████████████████████
@@ -175,4 +179,6 @@ population    of   actively-maintained
 servers remains.
 
 0some link      /some-menu
+
+bar
 ```
