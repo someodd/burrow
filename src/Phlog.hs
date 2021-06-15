@@ -249,7 +249,7 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
     buildPath <- getConfigValue configParser "general" "buildPath"
     phlogPath' <- getConfigValue configParser "phlog" "phlogPath"
     tagPath <- getConfigValue configParser "phlog" "tagPath"
-    let outputPath = buildPath ++ "/" ++ phlogPath' ++ "/.gophermap"
+    let outputPath = buildPath </> phlogPath' </> ".gophermap"
         phlogIndex = runReader mainPhlogIndex currentYear
     writeFile outputPath $ makePhlogIndexPage phlogIndex tagPath
    where
@@ -322,7 +322,7 @@ instance PhlogIndex [PostMeta] MainTagIndex where
     configParser <- getConfig
     buildPath <- getConfigValue configParser "general" "buildPath"
     tagPath <- getConfigValue configParser "phlog" "tagPath"
-    let mainTagIndexPath = buildPath ++ "/" ++ tagPath ++ "/.gophermap"
+    let mainTagIndexPath = buildPath </> tagPath </> ".gophermap"
 
     -- write out the main tag index
     createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
@@ -348,12 +348,13 @@ instance PhlogIndex [PostMeta] MainTagIndex where
             ]
       in intercalate "\n\n" $ map threeSummary allTags
 
+  -- FIXME: hardcoded paths!
   -- FIXME/TODO: this is not doing what it should be! very sloppily put together...
   renderAtom (MainTagIndex mainTagIndexMap) = do
     -- FIXME: bad!
     phlogConfig <- getPhlogConfig
     let phlogIndex = foldr ((++) . snd) [] $ HashMap.toList $ mainTagIndexMap
-        atomFeed = (createAtomFeed $ AtomFeedRecipe "blah" "foo" phlogIndex phlogConfig "phlog/tagSummary.xml") -- FIXME: path
+        atomFeed = (createAtomFeed $ AtomFeedRecipe "Tag Summaries" "foo" phlogIndex phlogConfig "phlog/tagSummary.xml") -- FIXME: path
     createDirectoryIfMissing True "built/phlog/"
     -- FIXME
     XML.writeFile def "built/phlog/tagSummary.xml" atomFeed

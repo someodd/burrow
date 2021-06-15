@@ -22,7 +22,7 @@ import Data.Maybe (fromMaybe)
 import System.Directory (copyFile)
 import qualified Data.HashMap.Strict as H
 import Data.List (isSuffixOf)
-import System.FilePath (takeDirectory)
+import System.FilePath (takeDirectory, (</>), (<.>), isExtensionOf)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -62,7 +62,6 @@ data ParseType = GopherFileType
 -- See also: `getSourceFiles`.
 type SourceFile = (FilePath, ParseType)
 
--- FIXME: mayeb this isn't how we want to do things since we have frontmatter
 -- | Get a list of source files' file paths to be used in order to construct
 -- the gopherhole, as well as the type of parser to use to render those paths.
 getSourceFiles :: FilePath -> IO [SourceFile]
@@ -74,11 +73,11 @@ getSourceFiles sourceDirectory = do
  where
   getParseType :: [String] -> FilePath -> ParseType
   getParseType dontSkipThese filePath
-    | any (`isSuffixOf` filePath) dontSkipMenuExtensions = GopherMenuType
-    | any (`isSuffixOf` filePath) dontSkipExtensions = GopherFileType
+    | any (`isExtensionOf` filePath) dontSkipMenuExtensions = GopherMenuType
+    | any (`isExtensionOf` filePath) dontSkipExtensions = GopherFileType
     | otherwise = Skip
    where
-     dontSkipMenuExtensions = map (".menu." ++) dontSkipThese
+     dontSkipMenuExtensions = map (".menu" <.>) dontSkipThese
      dontSkipExtensions = map ("." ++) dontSkipThese
 
 
@@ -91,7 +90,7 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
         { frrSourceDirectory = sourceDirectory
         , frrDestinationDirectory = destinationDirectory
         , frrSpacecookie = spaceCookie
-        , frrTemplateToRender = sourceDirectory ++ filePath
+        , frrTemplateToRender = sourcePath
         , frrParseType = parseType
         , frrOutPath = outPath
         , frrIncludePartial = Nothing
@@ -104,7 +103,7 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
     then
       pure (defaultRecipe, Nothing)
     else do
-      fileText <- TIO.readFile (sourceDirectory ++ "/" ++ filePath)
+      fileText <- TIO.readFile sourcePath
       let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
           templateToUse = frontMatter >>= fmParentTemplate
           renderAs = case frontMatter >>= fmRenderAs of
@@ -125,12 +124,18 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
         Nothing ->
           pure (recipeFrontMatterChanges, frontMatterReturnPair frontMatter)
         Just templateName ->
-          let partial'sTemplatePath = "templates/" ++ templateName
+          let partial'sTemplatePath = "templates" </> templateName
             -- FIXME, TODO: it feels like this is being done twice!
               newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter frontMatter variablePairs
               recipe = recipeFrontMatterChanges { frrIncludePartial = Just partial'sTemplatePath, frrSubstitutions = newDataForMustache }
           in pure (recipe, frontMatterReturnPair frontMatter)
  where
+  sourcePath :: FilePath
+  sourcePath = sourceDirectory </> filePath
+
+  outputPath :: FilePath
+  outputPath = destinationDirectory </> filePath
+
   dataForMustacheWithFrontmatter :: Maybe FrontMatter -> Maybe [(T.Text, T.Text)] -> [(T.Text, Mtype.Value)]
   dataForMustacheWithFrontmatter maybeFrontMatter variablePairs =
     let hardcodedFrontMatterVars = fromMaybe [] (variablePairs >>= Just . map (id . fst &&& Mtype.String . snd)) ++ dataForMustache
@@ -143,11 +148,9 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
   finalFilePath = do
     config <- getConfig
     indexName <- getConfigValue config "general" "directoryMapName"
-    let outPath =
-          if spaceCookie && indexName `isSuffixOf` filePath
-            then let x = (takeDirectory $ destinationDirectory ++ filePath) in x ++ "/.gophermap"
-            else destinationDirectory ++ filePath
-    pure outPath
+    if spaceCookie && indexName `isSuffixOf` filePath
+      then let x = (takeDirectory $ outputPath) in pure $ x </> ".gophermap"
+      else pure outputPath
 
 
 renderFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
@@ -159,7 +162,7 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
       pure (fst sourceFile, Nothing)
     else do
       fileText <- case maybeFrontMatterAndRestOfDoc of
-                    Nothing -> TIO.readFile (sourceDirectory ++ "/" ++ filePath)
+                    Nothing -> TIO.readFile (sourceDirectory </> filePath)
                     Just (_, restOfDocument) -> pure restOfDocument
       let frontMatter = maybeFrontMatterAndRestOfDoc >>= Just . fst
 
@@ -179,9 +182,9 @@ renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath
   -- Don't parse; just copy the file to the target directory.
   noParseOut :: FileRenderRecipe -> IO ()
   noParseOut recipe = do
-    let destination = frrDestinationDirectory recipe ++ filePath
+    let destination = frrDestinationDirectory recipe </> filePath
         destinationDirectory' = takeDirectory destination
-        source = frrSourceDirectory recipe ++ filePath
+        source = frrSourceDirectory recipe </> filePath
     createDirectoryIfMissing True destinationDirectory'
     copyFile source destination
 
@@ -261,7 +264,6 @@ parseMustache mainText recipe = do
 parseMarkdown :: FileRenderRecipe -> T.Text -> IO T.Text
 parseMarkdown recipe contents =
   case frrParseType recipe of
-    -- NOTE: The way this type is setup seems redundant/adds extra maintenence just use a sumtype like ParseType = GopherFile | GopherMenu? FIXME/NOTE/TODO
     -- Parse the markdown text out as a text file to be served in gopherspace.
     GopherFileType -> do
       parseOutGopherFile
@@ -306,7 +308,6 @@ parseMarkdown recipe contents =
 -- can be served via the Gopher protocol.
 buildGopherhole :: FilePath -> FilePath -> Bool -> IO ()
 buildGopherhole sourceDir destDir spaceCookie = do
-  --- FIXME: getSourceFiles needs to use the extensio directive in the ini file!
   sourceFiles <- getSourceFiles sourceDir :: IO [SourceFile]
   filePathFrontMatter <- traverse (renderFile sourceDir destDir spaceCookie) sourceFiles
   renderTagIndexes filePathFrontMatter
