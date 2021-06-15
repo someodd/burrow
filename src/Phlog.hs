@@ -24,7 +24,7 @@ import Data.Hashable (Hashable)
 import Data.Time.Calendar (toGregorian)
 import Data.Time.Clock (getCurrentTime, utctDay)
 import qualified Data.Dates.Parsing as DP
-import System.FilePath (splitExtension, takeDirectory)
+import System.FilePath (splitExtension, takeDirectory, (</>), (<.>))
 import System.Directory (createDirectoryIfMissing)
 import Data.Foldable (traverse_)
 import Data.Maybe (fromMaybe, fromJust)
@@ -119,14 +119,12 @@ getPhlogConfig = do
 data AtomFeedRecipe = AtomFeedRecipe
   { atomTitle :: T.Text
   -- ^ The title of the feed.
-  , atomID :: T.Text
-  -- ^ The ID of the feed (URI).
   , atomEntries :: [PostMeta]
   -- ^ All the individual entries for the feed.
   , atomPhlogConfig :: PhlogConfig
   -- ^ All of the information from the config required to create the feed.
   , atomPath :: FilePath
-  -- ^ Path (not URI) to this feed.
+  -- ^ Path (not URI) to this feed. Is also used for the feed ID and its self href.
   }
 
 data AtomFeedEntryRecipe = AtomFeedEntryRecipe
@@ -264,7 +262,7 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
     phlogConfig <- getPhlogConfig
     let phlogIndex = runReader mainPhlogIndex currentYear
         -- FIXME
-        atomFeed = (createAtomFeed $ AtomFeedRecipe {atomTitle="All Posts", atomID="foo", atomEntries=phlogIndex, atomPhlogConfig=phlogConfig, atomPath="phlog/main.xml"})
+        atomFeed = (createAtomFeed $ AtomFeedRecipe {atomTitle="All Posts", atomEntries=phlogIndex, atomPhlogConfig=phlogConfig, atomPath="phlog/main.xml"})
     createDirectoryIfMissing True "built/phlog/"
     XML.writeFile def "built/phlog/main.xml" atomFeed
 
@@ -320,6 +318,9 @@ instance PhlogIndex [PostMeta] MainTagIndex where
   renderIndexGophermap (MainTagIndex mainTagIndex) = do
     -- get paths from config
     configParser <- getConfig
+    -- FIXME: what if build path from CLI instead of INI? Also why not use getPhlogConfig?
+    -- It also doesn't make sense that we have a --spacecookie flag but then we just use
+    -- .gophermap by default everywhere.
     buildPath <- getConfigValue configParser "general" "buildPath"
     tagPath <- getConfigValue configParser "phlog" "tagPath"
     let mainTagIndexPath = buildPath </> tagPath </> ".gophermap"
@@ -351,13 +352,16 @@ instance PhlogIndex [PostMeta] MainTagIndex where
   -- FIXME: hardcoded paths!
   -- FIXME/TODO: this is not doing what it should be! very sloppily put together...
   renderAtom (MainTagIndex mainTagIndexMap) = do
-    -- FIXME: bad!
     phlogConfig <- getPhlogConfig
+    config <- getConfig
+    -- FIXME: what if CLI argument build path override?
+    buildPath <- getConfigValue config "general" "buildPath"
     let phlogIndex = foldr ((++) . snd) [] $ HashMap.toList $ mainTagIndexMap
-        atomFeed = (createAtomFeed $ AtomFeedRecipe "Tag Summaries" "foo" phlogIndex phlogConfig "phlog/tagSummary.xml") -- FIXME: path
-    createDirectoryIfMissing True "built/phlog/"
-    -- FIXME
-    XML.writeFile def "built/phlog/tagSummary.xml" atomFeed
+        phlogDirectory = phlogPath phlogConfig
+        atomRelativePath = phlogDirectory </> "tagSummary.xml"
+        atomFeed = (createAtomFeed $ AtomFeedRecipe "Tag Summaries" phlogIndex phlogConfig atomRelativePath) -- FIXME: path
+    createDirectoryIfMissing True $ buildPath </> phlogDirectory
+    XML.writeFile def (buildPath </> atomRelativePath) atomFeed
 
 
 -- FIXME: this no longer makes sense the way it compiles results.
@@ -392,12 +396,17 @@ instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
 
   renderAtom (SpecificTagIndex (tag, phlogIndex)) = do
     phlogConfig <- getPhlogConfig
-    let filePath = "built/phlog/tags/" ++ (T.unpack tag) ++ ".xml"
+    config <- getConfig
+    -- FIXME: what if output directory override cli
+    outputDirectory <- getConfigValue config "general" "buildPath"
+    let phlogDirectory = phlogPath phlogConfig
+        feedRelativePath = phlogDirectory </> "tags" </> (T.unpack tag <.> "xml")
+        outputPath = outputDirectory </> feedRelativePath
         metas = phlogIndex
         -- FIXME
-        atomFeed = (createAtomFeed $ AtomFeedRecipe (T.pack $ (T.unpack tag) ++ " tag phlog feed") "foo" metas phlogConfig ("phlog/tags/" ++ (T.unpack tag) ++ ".xml"))
-    createDirectoryIfMissing True (takeDirectory filePath)
-    XML.writeFile def filePath atomFeed
+        atomFeed = (createAtomFeed $ AtomFeedRecipe (T.pack $ (T.unpack tag) ++ " tag phlog feed") metas phlogConfig feedRelativePath)
+    createDirectoryIfMissing True (takeDirectory outputPath)
+    XML.writeFile def outputPath atomFeed
 
 
 newtype PostMetasGroupPair a = PostMetasGroupPair (String, a, [PostMeta]) -- this is what get accepted by the thingy builder
@@ -441,7 +450,7 @@ renderTagIndexes filePathFrontMatter = do
       ppmg@(PostMetasGroup (_, hashMap)) = (frontMatterHashMapGroup postMetaList ("tag", \pm -> fromMaybe [] (metaTags pm)) :: PostMetasGroup Tag)
       tagsFound = HashMap.keys hashMap
   -- Only render tag indexes if there are any tags to render.
-  if length tagsFound == 0
+  if length tagsFound > 0
      then do
       traverse_ (\x -> renderAll (createIndexModel $ getPostMetasGroupPair ppmg x :: SpecificTagIndex)) tagsFound
       let mainTagIndex = createIndexModel (preparePostsOnlyFromPairs filePathFrontMatter) :: MainTagIndex
