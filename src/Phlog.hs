@@ -383,7 +383,7 @@ instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
     configParser <- getConfig
     tagIndexPath <- getConfigValue configParser "phlog" "tagPath"
     buildPath <- getConfigValue configParser "general" "buildPath"
-    let outputPath = buildPath ++ "/" ++ tagIndexPath ++ "/" ++ (T.unpack tag) ++ "/.gophermap"
+    let outputPath = buildPath </> tagIndexPath </> (T.unpack tag) </> ".gophermap"
         outputDirectoryPath = takeDirectory outputPath
     createDirectoryIfMissing True outputDirectoryPath
     writeFile outputPath (tagIndexContents tag)
