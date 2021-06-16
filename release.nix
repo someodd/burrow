@@ -1,4 +1,7 @@
 let
-  pkgs = import <nixpkgs> { };
+  config = { allowBroken = true; };
 in
-  pkgs.haskellPackages.callPackage ./default.nix { }
+  let
+    pkgs = (import <nixpkgs> { inherit config; }).pkgsStatic;
+  in
+    pkgs.haskellPackages.callPackage ./default.nix { }

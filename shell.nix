@@ -1,8 +1,6 @@
 { nixpkgs ? import <nixpkgs> {} }:
 let
-  inherit (nixpkgs) pkgs;
-  inherit (pkgs) haskellPackages;
-
+  inherit (nixpkgs) haskellPackages;
   project = import ./release.nix;
 in
 pkgs.stdenv.mkDerivation {
