@@ -3,6 +3,9 @@ build:
 	export LC_ALL=C.UTF-8
 	nix-build release.nix
 
+regen:
+	nix-shell --pure -p cabal2nix --run "cabal2nix ." > default.nix
+
 run: build
 	result/bin/burrow --source example-gopherhole --destination built --spacecookie
 
