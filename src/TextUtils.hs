@@ -15,7 +15,7 @@ import Data.List.Split (chunksOf)
 
 import qualified Data.Text as Text
 
-import qualified Text.Layout.Table.Justify as Justify
+--import qualified Text.Layout.Table.Justify as Justify
 import Text.Wrap (WrapSettings(..), wrapTextToLines)
 
 
@@ -25,14 +25,8 @@ maxWidth :: Int
 maxWidth = 79
 
 
--- TODO: should hyphenate break long words
--- | Mustache-lambda-friendly function for text justification.
 justify2 :: Text.Text -> Text.Text
-justify2 text = Text.pack . unlines $ Justify.justifyText paragraphWidth (unlines wrappedLines)
- where
-  paragraphWidth = maxWidth
-  wrapSettings = WrapSettings { preserveIndentation = False, breakLongWords = True }
-  wrappedLines = map Text.unpack $ wrapTextToLines wrapSettings paragraphWidth text
+justify2 = justify'
 
 
 -- | The Mustache-lambda-friendly version of Burrow's custom text justification function.
@@ -42,9 +36,14 @@ justify' text = Text.pack . unlines $ justify (Text.unpack text)
 
 -- | Burrow's custom text justification function. Implemented for fun.
 justify :: String -> [String]
-justify string = map (flip addSpaceToNthWord 0) wrappedLines
+justify string = justify'' maxWidth string
+
+
+-- | Burrow's custom text justification function. Implemented for fun.
+justify'' :: Int -> String -> [String]
+justify'' maxWidth' string = map (flip addSpaceToNthWord 0) wrappedLines
  where
-  paragraphWidth = maxWidth
+  paragraphWidth = maxWidth'
   wrapSettings = WrapSettings { preserveIndentation = False, breakLongWords = True }
   wrappedLines = map Text.unpack $ wrapTextToLines wrapSettings paragraphWidth (Text.pack string)
 
@@ -83,6 +82,7 @@ justify string = map (flip addSpaceToNthWord 0) wrappedLines
         | otherwise = (x ++ [n]) : xs
 
 
+
 -- | Mustache-lambda-friendly version of the columnate function, meaning it has preconfigured
 -- column width, max width, and lines per column.
 columnate2 :: Text.Text -> Text.Text
@@ -109,7 +109,7 @@ columnate columnWidth totalMaxWidth maxLinesPerColumn textBlock = finalResult
   asSingleColumn =
     let wrapSettings = WrapSettings { preserveIndentation = False, breakLongWords = True } -- It's not breaking long words... should start using knuth's algo
         wrapped = wrapTextToLines wrapSettings columnWidth textBlock
-    in Text.unlines $ map (Text.justifyLeft columnWidth ' ') $ map Text.pack $ Justify.justifyText columnWidth (Text.unpack . Text.unlines $ wrapped)
+    in Text.unlines $ map (Text.justifyLeft columnWidth ' ') $ map Text.pack $ justify'' columnWidth (Text.unpack . Text.unlines $ wrapped)
 
   -- 2: Group the single justified column into text chunks of maxLinesPerColumn
   maxLinesGroups :: [[Text.Text]]

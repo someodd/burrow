@@ -64,6 +64,8 @@ data PostMeta = PostMeta
 
 -- FIXME: need beautiful errors informing a user of what is needed.
 -- only trigger this if it is post type?
+-- | Convert a `FileFrontMatter` pair to a `PostMeta` if all the required front
+-- matter is present.
 pairToPostMeta :: FileFrontMatter -> Maybe PostMeta
 pairToPostMeta (filePath, Just frontMatter) = Just $ PostMeta
   { metaPublished = fromJust $ fmPublished frontMatter
@@ -71,7 +73,7 @@ pairToPostMeta (filePath, Just frontMatter) = Just $ PostMeta
   , metaPath = T.pack filePath
   , metaTitle = fromJust $ fmTitle frontMatter
   , metaAuthor = fmAuthor frontMatter
-  -- ^ Can be Nothing because of default author entry in .ini
+  -- metaAuthor can be Nothing because of default author entry in .ini.
   , metaTags = fmTags frontMatter
   , metaFrontMatter = frontMatter
   }
@@ -236,12 +238,12 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
       _ <- ask
       pure $ postMetasPairs
 
+  -- | Create the main phlog index which includes all the posts sorted by date.
   renderIndexGophermap (MainPhlogIndex mainPhlogIndex) = do
     -- TODO: list main tag index
     -- TODO: 
     --  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
     -- FIXME: directories need to be defined in config
-    -- | Create the main phlog index which includes all the posts sorted by date.
     currentYear <- getCurrentYear
     configParser <- getConfig
     buildPath <- getConfigValue configParser "general" "buildPath"
