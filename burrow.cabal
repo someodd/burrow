@@ -136,7 +136,7 @@ library
   -- Directories containing source files.
   hs-source-dirs:      src
 
-test-suite waffle-test
+test-suite tests
   import: shared-properties
 
   -- The interface type and version of the test suite.
