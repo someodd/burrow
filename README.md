@@ -12,6 +12,11 @@ spacecookie ../data/spacecookie.json
 
 Written in Haskell. If you're looking for very similar software, with coincidentally the exact same name, please check out [James Tomasino's Burrow](https://github.com/jamestomasino/burrow).
 
+## Note about GHC
+
+Currently using GHC 8.10.4, because GHC 8.10.5 breaks DocTests and the latest
+version of GHC which supports Haskell/GHC 2021 isn't supported by Cabal yet.
+
 ## Features
 
 ### Front matter
@@ -182,3 +187,9 @@ servers remains.
 
 bar
 ```
+
+## Running tests
+
+Run the doc tests:
+
+`cabal exec cabal test`

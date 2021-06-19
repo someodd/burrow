@@ -57,6 +57,7 @@ data PostMeta = PostMeta
   -- ^ File path (relative) to the post.
   , metaTitle :: T.Text
   , metaAuthor :: Maybe T.Text
+  -- ^ Can be Nothing because of default author entry in the config `ini`.
   , metaTags :: Maybe [T.Text]
   , metaFrontMatter :: FrontMatter
   -- ^ All of the FrontMatter.
@@ -71,13 +72,11 @@ pairToPostMeta (filePath, Just frontMatter) = Just $ PostMeta
   , metaPath = T.pack filePath
   , metaTitle = fromJust $ fmTitle frontMatter
   , metaAuthor = fmAuthor frontMatter
-  -- ^ Can be Nothing because of default author entry in .ini
   , metaTags = fmTags frontMatter
   , metaFrontMatter = frontMatter
   }
 pairToPostMeta (_, Nothing) = Nothing
 
--- must filter out non post types FIXME
 -- | Filters out non-posts based on the type: post.
 preparePostsOnlyFromPairs :: [FileFrontMatter] -> [PostMeta]
 preparePostsOnlyFromPairs filePathFrontMatterPairs = do
@@ -132,6 +131,22 @@ data AtomFeedEntryRecipe = AtomFeedEntryRecipe
   , entryPhlogConfig :: PhlogConfig
   }
 
+
+-- | Get the URI which points to this gopherhole using the phlog config info.
+--
+-- >>> :{
+--  let
+--    phlogConfig =
+--      PhlogConfig
+--        { phlogPath="phlog/"
+--        , phlogTagPath="tag/"
+--        , phlogDefaultAuthor="foo"
+--        , phlogHost="example.org"
+--        , phlogPort="70"
+--        }
+--  in baseURL phlogConfig
+-- :}
+-- "gopher://example.org:70/"
 baseURL :: PhlogConfig -> String
 baseURL phlogConfig =
   "gopher://" ++ phlogHost phlogConfig ++ ":" ++ phlogPort phlogConfig ++ "/"
@@ -182,7 +197,6 @@ createAtomFeed atomFeedRecipe = do
     , XML.documentEpilogue = def
     }
 
--- TODO: look for patterns throughout all the instances and automate it here
 -- | Represents different kinds of phlog indexes and the tools required to do
 -- things with them.
 --
@@ -236,12 +250,8 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
       _ <- ask
       pure $ postMetasPairs
 
+  -- | Create the main phlog index which includes all the posts sorted by date.
   renderIndexGophermap (MainPhlogIndex mainPhlogIndex) = do
-    -- TODO: list main tag index
-    -- TODO: 
-    --  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
-    -- FIXME: directories need to be defined in config
-    -- | Create the main phlog index which includes all the posts sorted by date.
     currentYear <- getCurrentYear
     configParser <- getConfig
     buildPath <- getConfigValue configParser "general" "buildPath"
@@ -287,10 +297,6 @@ sortOnDate :: Integer -> [PostMeta] -> [PostMeta]
 sortOnDate _ = sortOn metaUpdated
 
 
--- FIXME TODO
--- in the future also should look more like a hashmap of tag to [(filepath, frontmatter)]
--- in fact passing the sorted tag index could be something handy to have as reader in both instances
--- for efficiency
 newtype MainTagIndex = MainTagIndex (HashMap.HashMap Tag [PostMeta])
 
 -- FIXME/TODO: there's a TON of overlap between this and the other tag indexes so write some helper functions
@@ -364,9 +370,6 @@ instance PhlogIndex [PostMeta] MainTagIndex where
     XML.writeFile def (buildPath </> atomRelativePath) atomFeed
 
 
--- FIXME: this no longer makes sense the way it compiles results.
--- this one could be more general like PostMetasCriterion for cats and authors etc
---newtype PostMetasTag = PostMetasTag (Tag, PostMetas)
 newtype SpecificTagIndex = SpecificTagIndex (Tag, [PostMeta])
 
 instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
@@ -418,15 +421,12 @@ getPostMetasGroupPair (PostMetasGroup (label, hashMap)) key =
   -- FIXME: fromjust
   PostMetasGroupPair (label, key, fromJust $ HashMap.lookup key hashMap)
 
+
 -- | Group posts together by some property of the FrontMatter. Weeds out posts
 -- without FrontMatter.
 --
 -- If you're not getting a value that is a list you can use Identity as the return
 -- value. 
---
--- >>> import Data.Functor.Identity (Identity(..))
--- >>> (frontMatterHashMapGroup somePostMetas ("title", Identity . title) :: (String, HashMap.HashMap (Maybe T.Text) [PostMeta))
--- >>> (frontMatterHashMapGroup somePostMetas ("tag", tags) :: (String, HashMap.HashMap Tag [PostMeta]))
 frontMatterHashMapGroup
   :: (Eq a, Hashable a, Foldable f)
   => [PostMeta]
@@ -459,9 +459,29 @@ renderTagIndexes filePathFrontMatter = do
 
 
 -- FIXME: pass the menu suffix here (file extension)
--- UH OH NOT USING SPECIFIC SUFFIXES FOR MENUS VS REGULAR FILES RESULTS IN THIS HEADACHE!
 -- | A useful tool in making phlog indexes: create a nice link for the menu
 -- using a supplied pair from PostMetas.
+--
+-- >>> import Time.Types
+-- >>> let dateTime = DateTime (Date 1986 February 21) (TimeOfDay 0 0 0 0)
+-- >>> :{
+--  let
+--    frontMatter =
+--      FrontMatter 
+--        (Just dateTime)
+--        (Just dateTime)
+--        (Just . T.pack $ "Zelda is Released Today!")
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--  in makeLocalLink . fromJust . pairToPostMeta $ ("zelda-release.txt", Just frontMatter)
+-- :}
+-- "0Zelda is Released Today!\t/zelda-release.txt"
 makeLocalLink :: PostMeta -> String
 makeLocalLink postMeta
   -- FIXME: hardcoded "menu"
@@ -491,12 +511,25 @@ data MenuLink = MenuLink
 -- gopherfiletypeNAME\t [SELECTOR [\tSERVER [\tPORT]]]
 --
 -- https://sternenseemann.github.io/spacecookie/spacecookie.gophermap.5.html
+--
+-- >>> :{
+--  let
+--    menuLink = MenuLink
+--      { linkType="0"
+--      , displayString="Apple Pie Recipe"
+--      , selector="recipe.txt"
+--      , server=Just "example.org"
+--      , port=Just 70
+--      }
+--  in show menuLink
+-- :}
+-- "0Apple Pie Recipe\t/recipe.txt\texample.org\t70"
 instance Show MenuLink where
   show ml =
     let firstPart =
           intercalate "\t"
             [ (linkType ml) ++ (displayString ml)
-            , "/" ++ (selector ml)
+            , "/" ++ (selector ml) -- FIXME: join path?
             ]
         secondPart =
           fromMaybe "" (server ml >>= \x -> port ml >>= \y -> Just $ "\t" ++ x ++ "\t" ++ (show y))

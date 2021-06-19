@@ -93,7 +93,7 @@ common shared-properties
   default-language:    Haskell2010
 
 
-executable burrow
+executable burrow-exec
   import: shared-properties
 
   -- .hs or .lhs file containing the Main module.
@@ -114,8 +114,9 @@ executable burrow
   autogen-modules:
     Paths_burrow
 
+  build-depends:       burrow-lib
 
-library
+library burrow-lib
   -- Modules exported by the library.
   import: shared-properties
 
@@ -136,11 +137,13 @@ library
   -- Directories containing source files.
   hs-source-dirs:      src
 
-test-suite tests
+test-suite burrow-testsuite
   import: shared-properties
 
   -- The interface type and version of the test suite.
   type:                exitcode-stdio-1.0
+
+  ghc-options: -threaded
 
   -- The directory where the test specifications are found.
   hs-source-dirs:      test
@@ -148,4 +151,4 @@ test-suite tests
   -- The entrypoint to the test suite.
   main-is:             DocTests.hs
 
-  build-depends:       doctest >= 0.16.3 && < 0.17,
+  build-depends:       burrow-lib, doctest >= 0.16.3 && < 0.17
