@@ -412,21 +412,33 @@ instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
     XML.writeFile def outputPath atomFeed
 
 
+-- | Currently I just use this for grouping together the (group label [like
+-- "tag"], actual group value [like "recipes"], and finally the list of
+-- PostMetas belonging to the group).
 newtype PostMetasGroupPair a = PostMetasGroupPair (String, a, [PostMeta]) -- this is what get accepted by the thingy builder
+
+-- | A bunch of `PostMetas` that have been grouped together based on some criteria.
 newtype PostMetasGroup a = PostMetasGroup (String, HashMap.HashMap a [PostMeta]) deriving (Show)
 
 
+-- | Create a single `PostMetasGroupPair` using a key to do a lookup from the
+-- results of grouping `PostMetas` together into a `PostMetasGroup`.
 getPostMetasGroupPair :: (Eq a, Hashable a) => PostMetasGroup a -> a -> PostMetasGroupPair a
 getPostMetasGroupPair (PostMetasGroup (label, hashMap)) key =
   -- FIXME: fromjust
   PostMetasGroupPair (label, key, fromJust $ HashMap.lookup key hashMap)
 
 
--- | Group posts together by some property of the FrontMatter. Weeds out posts
--- without FrontMatter.
+-- | Group posts together by some property of the `PostMeta`.
 --
--- If you're not getting a value that is a list you can use Identity as the return
--- value. 
+-- If you're not getting a value that is a list you can use Identity as the
+-- return value.
+--
+-- >>> import Data.Functor.Identity (Identity(..))
+-- >>> frontMatterHashMapGroup postMetas ("author", Identity . fromJust . metaAuthor) :: PostMetasGroup T.Text
+-- PostMetasGroup ("author",fromList [("Computer Nerd",[PostMeta {...metaPath = "unix-release.txt", metaTitle = "Unix is Released Today!", metaAuthor = Just "Computer Nerd"...}]),("A Video Game Fan",[PostMeta {...metaPath = "mario-release.txt", metaTitle = "Mario is Released Today!", metaAuthor = Just "A Video Game Fan",...},PostMeta {...metaPath = "zelda-release.txt", metaTitle = "Zelda is Released Today!", metaAuthor = Just "A Video Game Fan",...}])])
+-- >>> frontMatterHashMapGroup postMetas ("tag", \pm -> fromMaybe [] (metaTags pm)) :: PostMetasGroup Tag
+-- PostMetasGroup ("tag",fromList [("computing",[PostMeta {...metaTitle = "Unix is Released Today!",...metaTags = Just ["computing"], ...}]),("games",[PostMeta {...metaTitle = "Mario is Released Today!",...metaTags = Just ["games","nintendo"],...},PostMeta {...metaTitle = "Zelda is Released Today!",...metaTags = Just ["games","nintendo"],...}]),("nintendo",[PostMeta {...metaTitle = "Mario is Released Today!"...metaTags = Just ["games","nintendo"],...},PostMeta {...metaTitle = "Zelda is Released Today!",...metaTags = Just ["games","nintendo"],...}])])
 frontMatterHashMapGroup
   :: (Eq a, Hashable a, Foldable f)
   => [PostMeta]
@@ -436,6 +448,7 @@ frontMatterHashMapGroup postMetaList (groupName, groupFunction) =
   PostMetasGroup $ (groupName, HashMap.fromListWith (++) result)
  where
   result =
+    -- FIXME: will group tags ([foo, bar]: postmetas)... logically it shouldn't, though...
     [ (group, [postMeta]) | postMeta <- postMetaList, group <- (toList $ groupFunction postMeta)]
 
 
@@ -446,13 +459,15 @@ frontMatterHashMapGroup postMetaList (groupName, groupFunction) =
 renderTagIndexes :: [FileFrontMatter] -> IO ()
 renderTagIndexes filePathFrontMatter = do
   let postMetaList = preparePostsOnlyFromPairs filePathFrontMatter
-      -- FIXME/TODO: I filter out no tags instead of putting into [] group?
       ppmg@(PostMetasGroup (_, hashMap)) = (frontMatterHashMapGroup postMetaList ("tag", \pm -> fromMaybe [] (metaTags pm)) :: PostMetasGroup Tag)
       tagsFound = HashMap.keys hashMap
   -- Only render tag indexes if there are any tags to render.
   if length tagsFound > 0
      then do
+      -- Render the specific tag indexes using the tags we found and apply the
+      -- "renderAll" from the PhlogIndex SpecificTagIndex instance.
       traverse_ (\x -> renderAll (createIndexModel $ getPostMetasGroupPair ppmg x :: SpecificTagIndex)) tagsFound
+      -- Render the main tag index (summary of tags).
       let mainTagIndex = createIndexModel (preparePostsOnlyFromPairs filePathFrontMatter) :: MainTagIndex
       renderAll mainTagIndex
      else pure ()
@@ -462,25 +477,7 @@ renderTagIndexes filePathFrontMatter = do
 -- | A useful tool in making phlog indexes: create a nice link for the menu
 -- using a supplied pair from PostMetas.
 --
--- >>> import Time.Types
--- >>> let dateTime = DateTime (Date 1986 February 21) (TimeOfDay 0 0 0 0)
--- >>> :{
---  let
---    frontMatter =
---      FrontMatter 
---        (Just dateTime)
---        (Just dateTime)
---        (Just . T.pack $ "Zelda is Released Today!")
---        Nothing
---        Nothing
---        Nothing
---        Nothing
---        Nothing
---        Nothing
---        Nothing
---        Nothing
---  in makeLocalLink . fromJust . pairToPostMeta $ ("zelda-release.txt", Just frontMatter)
--- :}
+-- >>> makeLocalLink postMeta
 -- "0Zelda is Released Today!\t/zelda-release.txt"
 makeLocalLink :: PostMeta -> String
 makeLocalLink postMeta
@@ -534,6 +531,59 @@ instance Show MenuLink where
         secondPart =
           fromMaybe "" (server ml >>= \x -> port ml >>= \y -> Just $ "\t" ++ x ++ "\t" ++ (show y))
     in firstPart ++ secondPart
+
+-- $setup
+-- >>> :set -XOverloadedStrings
+-- >>> import Time.Types
+-- >>> :{
+--  let
+--    dateTime = DateTime (Date 1986 February 21) (TimeOfDay 0 0 0 0)
+--    frontMatter =
+--      FrontMatter 
+--        (Just dateTime)
+--        (Just dateTime)
+--        (Just "Zelda is Released Today!")
+--        (Just "A Video Game Fan")
+--        (Just ["games", "nintendo"])
+--        (Just "post")
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--    postMeta = fromJust . pairToPostMeta $ ("zelda-release.txt", Just frontMatter)
+--    dateTime2 = DateTime (Date 1985 September 13) (TimeOfDay 0 0 0 0)
+--    frontMatter2 =
+--      FrontMatter 
+--        (Just dateTime2)
+--        (Just dateTime2)
+--        (Just "Mario is Released Today!")
+--        (Just "A Video Game Fan")
+--        (Just ["games", "nintendo"])
+--        (Just "post")
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--    postMeta2 = fromJust . pairToPostMeta $ ("mario-release.txt", Just frontMatter2)
+--    dateTime3 = DateTime (Date 1971 November 3) (TimeOfDay 0 0 0 0)
+--    frontMatter3 =
+--      FrontMatter 
+--        (Just dateTime3)
+--        (Just dateTime3)
+--        (Just "Unix is Released Today!")
+--        (Just "Computer Nerd")
+--        (Just ["computing"])
+--        (Just "post")
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--    postMeta3 = fromJust . pairToPostMeta $ ("unix-release.txt", Just frontMatter3)
+--    postMetas = [postMeta, postMeta2, postMeta3]
+-- :}
 
 {- $phlogIndexes
 
