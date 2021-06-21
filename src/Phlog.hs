@@ -432,10 +432,13 @@ getPostMetasGroupPair (PostMetasGroup (label, hashMap)) key =
 -- | Group posts together by some property of the `PostMeta`.
 --
 -- If you're not getting a value that is a list you can use Identity as the
--- return value.
+-- return value. You can also rely on record functions that have a type of
+-- `Maybe a`.
 --
 -- >>> import Data.Functor.Identity (Identity(..))
--- >>> frontMatterHashMapGroup postMetas ("author", Identity . fromJust . metaAuthor) :: PostMetasGroup T.Text
+-- >>> frontMatterHashMapGroup postMetas ("title", Identity . metaTitle) :: PostMetasGroup T.Text
+-- PostMetasGroup ("title",fromList [...,("Duplicate Post Title",[PostMeta {...metaPath = "duplicate-post-title2.txt", metaTitle = "Duplicate Post Title"...},PostMeta {...metaPath = "duplicate-post-title.txt", metaTitle = "Duplicate Post Title"...}]),...,...)
+-- >>> frontMatterHashMapGroup postMetas ("author", metaAuthor) :: PostMetasGroup T.Text
 -- PostMetasGroup ("author",fromList [("Computer Nerd",[PostMeta {...metaPath = "unix-release.txt", metaTitle = "Unix is Released Today!", metaAuthor = Just "Computer Nerd"...}]),("A Video Game Fan",[PostMeta {...metaPath = "mario-release.txt", metaTitle = "Mario is Released Today!", metaAuthor = Just "A Video Game Fan",...},PostMeta {...metaPath = "zelda-release.txt", metaTitle = "Zelda is Released Today!", metaAuthor = Just "A Video Game Fan",...}])])
 -- >>> frontMatterHashMapGroup postMetas ("tag", \pm -> fromMaybe [] (metaTags pm)) :: PostMetasGroup Tag
 -- PostMetasGroup ("tag",fromList [("computing",[PostMeta {...metaTitle = "Unix is Released Today!",...metaTags = Just ["computing"], ...}]),("games",[PostMeta {...metaTitle = "Mario is Released Today!",...metaTags = Just ["games","nintendo"],...},PostMeta {...metaTitle = "Zelda is Released Today!",...metaTags = Just ["games","nintendo"],...}]),("nintendo",[PostMeta {...metaTitle = "Mario is Released Today!"...metaTags = Just ["games","nintendo"],...},PostMeta {...metaTitle = "Zelda is Released Today!",...metaTags = Just ["games","nintendo"],...}])])
@@ -582,7 +585,37 @@ instance Show MenuLink where
 --        Nothing
 --        Nothing
 --    postMeta3 = fromJust . pairToPostMeta $ ("unix-release.txt", Just frontMatter3)
---    postMetas = [postMeta, postMeta2, postMeta3]
+--    dateTime4 = DateTime (Date 2021 June 19) (TimeOfDay 20 36 0 0)
+--    frontMatter4 =
+--      FrontMatter 
+--        (Just dateTime4)
+--        (Just dateTime4)
+--        (Just "Duplicate Post Title")
+--        Nothing
+--        Nothing
+--        (Just "post")
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--    postMeta4 = fromJust . pairToPostMeta $ ("duplicate-post-title.txt", Just frontMatter4)
+--    dateTime5 = DateTime (Date 2021 June 10) (TimeOfDay 06 25 0 0)
+--    frontMatter5 =
+--      FrontMatter 
+--        (Just dateTime5)
+--        (Just dateTime5)
+--        (Just "Duplicate Post Title")
+--        Nothing
+--        Nothing
+--        (Just "post")
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--        Nothing
+--    postMeta5 = fromJust . pairToPostMeta $ ("duplicate-post-title2.txt", Just frontMatter5)
+--    postMetas = [postMeta, postMeta2, postMeta3, postMeta4, postMeta5]
 -- :}
 
 {- $phlogIndexes

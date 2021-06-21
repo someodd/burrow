@@ -48,6 +48,8 @@ extra-source-files:
   README.md
   CHANGELOG.md
 
+tested-with: GHC == 8.10.4
+
 -- FIXME: need to pin version
 common shared-properties
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror
