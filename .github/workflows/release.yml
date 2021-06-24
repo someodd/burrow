@@ -20,13 +20,13 @@ jobs:
         run: make release GHC_VERSION=8.10.4 BURROW_VERSION=${{ env.RELEASE_VERSION }}
       - name: Use new version in cabal (commit, reset tag)
         run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add burrow.cabal
           git tag -d ${{ env.RELEASE_VERSION }}
           git commit -m "${{ env.RELEASE_VERSION }}"
           git tag -a ${{ env.RELEASE_VERSION }} -m "${{ env.RELEASE_VERSION }}"
           #git push origin HEAD --tags
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
