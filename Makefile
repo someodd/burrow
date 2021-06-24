@@ -9,5 +9,5 @@ static_build:
 	echo "Built to /tmp/burrow-src/dist-newstyle/build/x86_64-linux/ghc-${GHC_VERSION}/burrow-${BURROW_VERSION}/x/burrow/build/burrow/burrow"
 
 release:
-	#sed -i --regexp-extended 's/^version:[ \t]+[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/version: ${BURROW_VERSION}/' burrow.cabal
+	sed -i "s/^version:[[:space:]]\+[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/version: ${BURROW_VERSION}/g" burrow.cabal
 	make static_build
