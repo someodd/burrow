@@ -6,7 +6,7 @@ static_build:
 	cp -r . /tmp/burrow-src
 	rm -rf /tmp/burrow-src/dist-newstyle
 	docker run --rm -v /tmp/burrow-bin-result:/host-bin -v /tmp/burrow-src:/home/build "fossa/haskell-static-alpine:ghc-${GHC_VERSION}" /bin/sh -c "cd /home/build && cabal update && cabal build --enable-executable-static"
-	echo "Built to /tmp/burrow-src/dist-newstyle/build/x86_64-linux/ghc-${GHC_VERSION}/burrow-${BURROW_VERSION}/x/burrow/build/burrow/burrow"
+	tar -czf "burrow-${BURROW_VERSION}-x86_64-linux.tar.gz" "/tmp/burrow-src/dist-newstyle/build/x86_64-linux/ghc-${GHC_VERSION}/burrow-${BURROW_VERSION}/x/burrow/build/burrow/burrow"
 
 release:
 	sed -i "s/^version:[[:space:]]\+[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/version: ${BURROW_VERSION}/g" burrow.cabal
