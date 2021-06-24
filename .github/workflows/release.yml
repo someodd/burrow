@@ -21,6 +21,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: /tmp/burrow-src/dist-newstyle/build/x86_64-linux/ghc-8.10.4/burrow-${{ env.RELEASE_VERSION }}/x/burrow/build/burrow/burrow
+          files: burrow-${{ env.RELEASE_VERSION }}-x86_64-linux.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
