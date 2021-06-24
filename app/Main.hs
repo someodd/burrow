@@ -5,6 +5,8 @@ module Main where
 import Build
 
 import Options.Applicative hiding (ParseError)
+import Paths_burrow (version)
+import Data.Version (showVersion)
 
 -- | Model for the CLI options
 -- usage: burrow.hs source-dir-or-file --version --help --destination=some-dir
@@ -33,7 +35,7 @@ main = do
        header "burrow: build gopherholes using Mustache and Markdown")
 
   versionOption :: Parser (a -> a)
-  versionOption = infoOption "0.0" (long "version" <> help "Show version")
+  versionOption = infoOption (showVersion version) (long "version" <> help "Show version")
 
   programOptions =
     Opts <$> strOption (long "source" <> metavar "DIR" <> help "Directory to parse.") <*>
