@@ -105,7 +105,15 @@ executable burrow
   -- Directories containing source files.
   hs-source-dirs:      app
 
-  build-depends:       burrow
+  build-depends:
+    burrow,
+
+  other-modules:
+    Paths_burrow
+
+  autogen-modules:
+    Paths_burrow
+
 
 library
   -- Modules exported by the library.
