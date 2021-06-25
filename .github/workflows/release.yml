@@ -24,7 +24,7 @@ jobs:
         if: ${{ steps.version-check.tag }}
         run: make release GHC_VERSION=8.10.4 BURROW_VERSION=${{ steps.version-check.tag }}
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         if: ${{ steps.version-check.tag }}
         with:
           prerelease: true
