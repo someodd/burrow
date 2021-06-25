@@ -11,3 +11,8 @@ static_build:
 release:
 	sed -i "s/^version:[[:space:]]\+[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/version: ${BURROW_VERSION}/g" burrow.cabal
 	make static_build
+	# make debian package
+	mkdir -p "/tmp/burrow_${BURROW_VERSION}_amd64/usr/local/bin/"
+	mkdir -p "/tmp/burrow_${BURROW_VERSION}_amd64/DEBIAN"
+	echo "Package: burrow\nVersion: ${BURROW_VERSION}\nArchitecture: amd64\nMaintainer: hyperrealgopher <hyperrealgopher@protonmail.ch>\nDescription: Static site builder, but for gopherholes.\n Manage phlogs with tags, use the Markdown renderer and Mustache templating system." > "/tmp/burrow_${BURROW_VERSION}_amd64/DEBIAN/control"
+	dpkg-deb --build --root-owner-group "/tmp/burrow_${BURROW_VERSION}_amd64"
