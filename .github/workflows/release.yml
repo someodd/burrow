@@ -1,5 +1,6 @@
 name: Release
 
+# should do this only on master as well?
 on: 
   push:
     paths:
@@ -27,6 +28,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: ${{ steps.version-check.outputs.tag }}
         with:
+          name: ${{ steps.version-check.outputs.tag }}
+          tag_name: ${{ steps.version-check.outputs.tag }}
           prerelease: true
           fail_on_unmatched_files: true
           files: |
