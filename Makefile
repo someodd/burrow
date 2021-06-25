@@ -9,7 +9,7 @@ static_build:
 	tar -czf "burrow-${BURROW_VERSION_CABAL}-x86_64-linux.tar.gz" -C "/tmp/burrow-src/dist-newstyle/build/x86_64-linux/ghc-${GHC_VERSION}/burrow-${BURROW_VERSION_CABAL}/x/burrow/build/burrow/" burrow
 
 release:
-	export BURROW_VERSION_CABAL="$(sed -n "s/^version:[[:space:]]\+\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\)\+/\1/p" burrow.cabal)"
+	export BURROW_VERSION_CABAL='$(sed -n "s/^version:[[:space:]]\+\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\)\+/\1/p" burrow.cabal)'
 	make static_build
 	# make debian package
 	mkdir -p "/tmp/burrow_${BURROW_VERSION_CABAL}_amd64/usr/local/bin/"
