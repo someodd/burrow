@@ -16,7 +16,7 @@ synopsis:            Build gopherholes.
 
 -- A longer description of the package.
 description:
-  Pong written in Gloss which uses spin as its primary mechanic.
+  Static site builder, but for gopherholes.\n Manage phlogs with tags, use the Markdown renderer and Mustache templating system.
 
 -- URL for the project homepage or repository.
 homepage:            https://github.com/hyperrealgopher/burrow
@@ -40,7 +40,7 @@ maintainer:          hyperrealgopher@protonmail.ch
 -- A copyright notice.
 -- copyright:
 
-category:            Games
+category:            Network
 
 -- Extra files to be distributed with the package, such as examples or a
 -- README.
