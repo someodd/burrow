@@ -2,52 +2,35 @@ name: Release
 
 on: 
   push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
+    paths:
+      burrow.cabal
 
 jobs:
   # Release job
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Set env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - name: Checkout code
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Detect version change in cabal
+        uses: salsify/action-detect-and-tag-new-version
+        with:
+          version-command: |
+            sed -n "s/^version:[[:space:]]\+\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\)\+/\1/p" burrow.cabal
       - name: Tag to version in cabal, make static binary tar.gz
-        run: make release GHC_VERSION=8.10.4 BURROW_VERSION=${{ env.RELEASE_VERSION }}
-      - name: Use new version in cabal (commit, reset tag)
-        run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add burrow.cabal
-          git tag -d ${{ env.RELEASE_VERSION }}
-          git commit -m "${{ env.RELEASE_VERSION }}"
-          git tag -a ${{ env.RELEASE_VERSION }} -m "${{ env.RELEASE_VERSION }}"
-          #git push origin HEAD --tags
-      - name: Push changes (tag)
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
-          tags: true
-          force: true
-      - name: Push changes (master/branch)
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: master
+        if: ${{ tag }}
+        run: make release GHC_VERSION=8.10.4 BURROW_VERSION=${{ tag }}
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: ${{ tag }}
         with:
           prerelease: true
           fail_on_unmatched_files: true
           files: |
-            burrow-${{ env.RELEASE_VERSION }}-x86_64-linux.tar.gz
-            burrow_${{ env.RELEASE_VERSION }}_amd64.deb
+            burrow-${{ tag }}-x86_64-linux.tar.gz
+            burrow_${{ tag }}_amd64.deb
           body: Unstable/alpha release.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
