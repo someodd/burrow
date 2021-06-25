@@ -39,12 +39,15 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: master
-      - name: Upload release asset
+      - name: Upload release assets
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           prerelease: true
-          files: burrow-${{ env.RELEASE_VERSION }}-x86_64-linux.tar.gz
+          fail_on_unmatched_files: true
+          files: |
+            burrow-${{ env.RELEASE_VERSION }}-x86_64-linux.tar.gz
+            burrow_${{ env.RELEASE_VERSION }}_amd64.deb
           body: Unstable/alpha release.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
