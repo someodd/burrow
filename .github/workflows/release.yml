@@ -22,7 +22,7 @@ jobs:
             sed -n "s/^version:[[:space:]]\+\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\)\+/\1/p" burrow.cabal
       - name: Tag to version in cabal, make static binary tar.gz
         if: ${{ steps.version-check.outputs.tag }}
-        run: make release GHC_VERSION=8.10.4 BURROW_VERSION=${{ steps.version-check.outputs.tag }}
+        run: make release GHC_VERSION=8.10.4
       - name: Upload release assets
         uses: softprops/action-gh-release@v1
         if: ${{ steps.version-check.outputs.tag }}
