@@ -36,9 +36,9 @@ jobs:
           force: true
       - name: Upload release asset
         uses: softprops/action-gh-release@v1
-        prerelease: true
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          prerelease: true
           files: burrow-${{ env.RELEASE_VERSION }}-x86_64-linux.tar.gz
           body: Unstable/alpha release.
         env:
