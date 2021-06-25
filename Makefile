@@ -2,6 +2,7 @@
 # We use alpine edge because it has musl by default for libc which a static
 # libc is needed for static compilation to happen.
 static_build:
+	export BURROW_VERSION_CABAL='$(sed -n "s/^version:[[:space:]]\+\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\)\+/\1/p" burrow.cabal)'
 	rm -rf /tmp/burrow-src
 	cp -r . /tmp/burrow-src
 	rm -rf /tmp/burrow-src/dist-newstyle
