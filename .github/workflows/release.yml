@@ -15,22 +15,23 @@ jobs:
         with:
           fetch-depth: 0
       - name: Detect version change in cabal
+        id: version-check
         uses: salsify/action-detect-and-tag-new-version
         with:
           version-command: |
             sed -n "s/^version:[[:space:]]\+\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\)\+/\1/p" burrow.cabal
       - name: Tag to version in cabal, make static binary tar.gz
-        if: ${{ tag }}
-        run: make release GHC_VERSION=8.10.4 BURROW_VERSION=${{ tag }}
+        if: ${{ steps.version-check.tag }}
+        run: make release GHC_VERSION=8.10.4 BURROW_VERSION=${{ steps.version-check.tag }}
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
-        if: ${{ tag }}
+        if: ${{ steps.version-check.tag }}
         with:
           prerelease: true
           fail_on_unmatched_files: true
           files: |
-            burrow-${{ tag }}-x86_64-linux.tar.gz
-            burrow_${{ tag }}_amd64.deb
+            burrow-${{ steps.version-check.tag }}-x86_64-linux.tar.gz
+            burrow_${{ steps.version-check.tag }}_amd64.deb
           body: Unstable/alpha release.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
