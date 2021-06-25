@@ -30,8 +30,8 @@ jobs:
           prerelease: true
           fail_on_unmatched_files: true
           files: |
-            burrow-${{ steps.version-check.outputs.tag }}-x86_64-linux.tar.gz
-            burrow_${{ steps.version-check.outputs.tag }}_amd64.deb
+            burrow-${{ steps.version-check.outputs.current_version }}-x86_64-linux.tar.gz
+            burrow_${{ steps.version-check.outputs.current_version }}_amd64.deb
           body: Unstable/alpha release.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
