@@ -14,6 +14,7 @@ release:
 	make static_build
 	# make debian package
 	mkdir -p "/tmp/burrow_${BURROW_VERSION_CABAL}_amd64/usr/local/bin/"
+	cp "/tmp/burrow-src/dist-newstyle/build/x86_64-linux/ghc-${GHC_VERSION}/burrow-${BURROW_VERSION_CABAL}/x/burrow/build/burrow/burrow" "/tmp/burrow_${BURROW_VERSION_CABAL}_amd64/usr/local/bin/"
 	mkdir -p "/tmp/burrow_${BURROW_VERSION_CABAL}_amd64/DEBIAN"
 	echo "Package: burrow\nVersion: ${BURROW_VERSION_CABAL}\nArchitecture: amd64\nMaintainer: hyperrealgopher <hyperrealgopher@protonmail.ch>\nDescription: Static site builder, but for gopherholes.\n Manage phlogs with tags, use the Markdown renderer and Mustache templating system." > "/tmp/burrow_${BURROW_VERSION_CABAL}_amd64/DEBIAN/control"
 	dpkg-deb --build --root-owner-group "/tmp/burrow_${BURROW_VERSION_CABAL}_amd64"
