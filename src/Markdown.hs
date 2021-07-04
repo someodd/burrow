@@ -11,13 +11,16 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE UndecidableInstances       #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 module Markdown where
 
+import Text.Numeral.Roman (toRoman)
 import Control.Monad.Reader
 import qualified Data.Map as Map
 import Commonmark hiding (addAttribute, escapeURI)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import Data.Char (toLower)
 
 import TextUtils.Headings
 
@@ -165,6 +168,8 @@ gopherFileOrNull penv func = do
     GopherFileNull -> pure GopherFileNull
 
 
+-- TODO: add functions that are general from textutils for formatting
+-- stuff like blockquote and all that.
 instance IsInline (ParseEnv GopherFile) => IsBlock (ParseEnv GopherFile) (ParseEnv GopherFile) where
   paragraph penv = do
     gopherFileOrNull penv (\ils -> pure $ GopherFile $ parseParagraph ils)
@@ -175,13 +180,37 @@ instance IsInline (ParseEnv GopherFile) => IsBlock (ParseEnv GopherFile) (ParseE
   rawBlock _ t = pure $ GopherFile t
   referenceLinkDefinition _ _ = pure $ GopherFile ""
 
+  -- FIXME: listItems will be a list of ParseEnv GopherFile...
   -- TODO/FIXME: use config-based definition of bullet char and actually
   -- build the unordered list.
-  list (BulletList _) _ _ = pure $ GopherFile ""
-
+  -- ListSpacing (which can be TightList or LooseList) is set to a hole right now (_)
+  -- because I have no idea what it does or is for.
+  list (BulletList bulletChar) _ listItems = do
+    let listItemsInsideOut = sequence listItems
+    listItemsListText <- listItemsInsideOut
+    pure $ GopherFile $ T.intercalate "\n" . map (((T.pack $ bulletChar : []) <> " ") <>) . map (\(GopherFile x) -> x) $ listItemsListText
   -- TODO/FIXME: use config-based definition of delimiter type/enumtype
   -- (OrderedList startnum enumtype _delimtype) lSpacing items
-  list (OrderedList _ _ _) _ _ = pure $ GopherFile ""
+  -- ListSpacing (which can be TightList or LooseList) is set to a hole right now (_)
+  -- because I have no idea what it does or is for. Maybe it's for when it keeps leading
+  -- spaces?
+  -- i have no idea what the first arg for the orderedlist constructor "number" does either... is it what it starts at?
+  list (OrderedList number enumeratorType delimiterType) _ listItems = do
+    let (enumerator :: [Text]) =
+          case enumeratorType of
+            Decimal -> map (T.pack . show) (drop (number - 1) [1..] :: [Int])
+            UpperAlpha -> map (T.pack . show) $ drop (number - 1) ['A'..'Z']
+            LowerAlpha -> map (T.pack . show) $ drop (number - 1) ['a'..'z']
+            UpperRoman -> map (T.pack . toRoman) (drop (number - 1) [1..] :: [Int])
+            LowerRoman -> map (T.pack . map toLower . toRoman) (drop (number - 1) [1..] :: [Int]) :: [Text]
+        prefixEnumerator =
+          case delimiterType of
+            Period -> map (<> ". ") enumerator
+            OneParen -> map (<> ") ") enumerator
+            TwoParens -> map (\x -> "(" <> x <> ") ") enumerator
+        listItemsInsideOut = sequence listItems
+    listItemsListText <- listItemsInsideOut
+    pure . GopherFile $ T.intercalate "\n" . map (\(prefix, item) -> prefix <> item) . zip prefixEnumerator $ (map (\(GopherFile x) -> x) listItemsListText :: [Text])
 
   -- | Create fancy ASCII-art headers using the ASCII art font system.
   heading level penv = do

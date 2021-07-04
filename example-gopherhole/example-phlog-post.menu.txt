@@ -13,3 +13,27 @@ skipMarkdown: false
 This is an example phlog post. 
 
 [Example link to self!](/example-phlog-post.menu.txt)
+
+Here is an unordered list:
+
+* First item
+* Second item
+* Third item
+
+Here is an ordered list:
+
+1. First item
+1. Second item
+1. Third item
+
+Here is an ordered list (starting at 2):
+
+2. First item
+2. Second item
+2. Third item
+
+Here is an ordered list (roman numerals, lowercase, parens):
+
+(i) First item
+(i) Second item
+(i) Third item
