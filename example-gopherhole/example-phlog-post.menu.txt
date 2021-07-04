@@ -10,7 +10,9 @@ skipMustache: false
 skipMarkdown: false
 ---
 
-This is an example phlog post. 
+This is an example phlog post.  **This is bold.**
+
+*This paragraph is italic.*
 
 [Example link to self!](/example-phlog-post.menu.txt)
 

@@ -7,9 +7,12 @@ module TextUtils
   ( justify2
   , justify'
   , columnate2
+  , italicize
+  , embolden
   )
 where
 
+import qualified Data.Map as Map
 import Data.List (intercalate, transpose)
 import Data.List.Split (chunksOf)
 
@@ -17,6 +20,52 @@ import qualified Data.Text as Text
 
 import qualified Text.Layout.Table.Justify as Justify
 import Text.Wrap (WrapSettings(..), wrapTextToLines)
+
+
+-- | the key is the normal character and the value is the fancy font character.
+type FontReplace = Map.Map Char Char
+
+fontReplace :: FontReplace -> Text.Text -> Text.Text
+fontReplace replaceMap text =
+  Text.map charSwap text
+ where
+   charSwap c =
+     case Map.lookup c replaceMap of
+       Just newChar -> newChar
+       Nothing -> c
+
+makeFontReplace :: String -> String -> FontReplace
+makeFontReplace uppercase lowercase =
+  Map.fromList $ zip (['A'..'Z'] ++ ['a'..'z']) (uppercase ++ lowercase)
+
+-- | Make text italic where possible.
+--
+-- >>> italicize "Hello, world!"
+-- ...
+italicize :: Text.Text -> Text.Text
+italicize text = 
+  fontReplace italicMap text
+ where
+  capitalItalics = "𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡"
+  lowerItalics = "𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻"
+
+  italicMap :: FontReplace
+  italicMap = makeFontReplace capitalItalics lowerItalics
+
+-- | Make text bold where possible.
+--
+-- >>> embolden "Hello, world!"
+-- ...
+embolden :: Text.Text -> Text.Text
+embolden text = 
+  fontReplace boldMap text
+ where
+  capitalBold = "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭"
+  lowerBold = "𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇"
+
+  boldMap :: FontReplace
+  boldMap = makeFontReplace capitalBold lowerBold
+
 
 
 -- | The maximum width of the gopherhole page. All the functions use this

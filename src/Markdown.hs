@@ -22,6 +22,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import Data.Char (toLower)
 
+import TextUtils (italicize, embolden)
 import TextUtils.Headings
 
 
@@ -128,8 +129,8 @@ instance Rangeable (ParseEnv GopherFile) => IsInline (ParseEnv GopherFile) where
   str t = pure $ GopherFile t
   entity t = pure $ GopherFile t
   escapedChar c = pure $ GopherFile (T.pack $ c:[])
-  emph ils = ils
-  strong ils = ils
+  emph ils = (\(GopherFile x) -> GopherFile $ italicize x) <$> ils
+  strong ils = (\(GopherFile x) -> GopherFile $ embolden x) <$> ils
   code t = pure $ GopherFile t
   rawInline _ t = pure $ GopherFile t
 
