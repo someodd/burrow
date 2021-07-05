@@ -44,24 +44,32 @@ import Markdown
 import Mustache
 
 
--- | The Markdown parser to use to transform Markdown files to various outputs
--- (like menus/gophermaps) suitable for gopherspace.
-data ParseType = GopherFileType
-               -- ^ Parse to plaintext ASCII-art-style file.
-               | GopherMenuType
-               -- ^ Parse to a gophermap/Gopher menu.
-               -- NOTE: for below: maybe better named "CopyOnly!"
-               | Skip
-               -- ^ Will not be parsed! Will simply be copied.
-               deriving (Show, Eq)
+-- | Content type that the builder recognizes/finds useful in the build
+-- process. This describes the kind of file it will be as an end product in the
+-- gopherhole.
+data ContentType = GopherFileType
+                 -- ^ Parse to plaintext ASCII-art-style file.
+                 | GopherMenuType
+                 -- ^ Will not be parsed! Will simply be copied.
+                 deriving (Show, Eq)
+
+
+-- | The content type in gopherspace as far as the renderer is concerned. This
+-- helps inform the file's build process, like which Markdown parser (if any)
+-- to use by default, or if the file should only be copied.
+data BuildJobType = RenderEngine ContentType
+                  -- ^ Decides which rendering process to go through...
+                  | SimplyCopy
+                  deriving (Show, Eq)
 
 
 -- | A relative path to a file to parse (excluding its parent-most directory)
 -- and which parser shall be used to parse it.
 --
 -- See also: `getSourceFiles`.
-type SourceFile = (FilePath, ParseType)
+type SourceFile = (FilePath, BuildJobType)
 
+-- NOTE: when I say "skip" here I mean not using a RenderEngine.
 -- | Get a list of source files' file paths to be used in order to construct
 -- the gopherhole, as well as the type of parser to use to render those paths.
 getSourceFiles :: FilePath -> IO [SourceFile]
@@ -69,29 +77,29 @@ getSourceFiles sourceDirectory = do
   config <- getConfig
   dontSkipThese <- fmap words $ getConfigValue config "general" "buildExtensions"
   filesMatching <- getDirectoryFiles sourceDirectory ["**/*"]
-  pure $ fmap (\x -> (x, getParseType dontSkipThese x)) filesMatching
+  pure $ fmap (\x -> (x, getBuildJobType dontSkipThese x)) filesMatching
  where
-  getParseType :: [String] -> FilePath -> ParseType
-  getParseType dontSkipThese filePath
-    | any (`isExtensionOf` filePath) dontSkipMenuExtensions = GopherMenuType
-    | any (`isExtensionOf` filePath) dontSkipExtensions = GopherFileType
-    | otherwise = Skip
+  getBuildJobType :: [String] -> FilePath -> BuildJobType
+  getBuildJobType dontSkipThese filePath
+    | any (`isExtensionOf` filePath) dontSkipMenuExtensions = RenderEngine GopherMenuType
+    | any (`isExtensionOf` filePath) dontSkipExtensions = RenderEngine GopherFileType
+    | otherwise = SimplyCopy
    where
      dontSkipMenuExtensions = map (".menu" <.>) dontSkipThese
      dontSkipExtensions = map ("." ++) dontSkipThese
 
 
 -- FIXME: this may result in the file being read twice.
--- | Create a `FileRenderRecipe` for rendering a file.
-createRenderRecipe :: FilePath -> FilePath -> Bool -> SourceFile -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
-createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, parseType) = do
+-- | Create a `FileRenderRecipe` for rendering a file. Gets a file ready for being built.
+createRenderRecipe :: FilePath -> FilePath -> Bool -> FilePath -> ContentType -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
+createRenderRecipe sourceDirectory destinationDirectory spaceCookie filePath contentType = do
   outPath <- finalFilePath
   let defaultRecipe = FileRenderRecipe
         { frrSourceDirectory = sourceDirectory
         , frrDestinationDirectory = destinationDirectory
         , frrSpacecookie = spaceCookie
         , frrTemplateToRender = sourcePath
-        , frrParseType = parseType
+        , frrContentType = contentType
         , frrOutPath = outPath
         , frrIncludePartial = Nothing
         , frrSubstitutions = dataForMustache
@@ -99,36 +107,32 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
         , frrSkipMarkdown = False
         }
 
-  if parseType == Skip
-    then
-      pure (defaultRecipe, Nothing)
-    else do
-      fileText <- TIO.readFile sourcePath
-      let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
-          templateToUse = frontMatter >>= fmParentTemplate
-          renderAs = case frontMatter >>= fmRenderAs of
-                       Just renderName -> case renderName of
-                                            "menu" -> GopherMenuType
-                                            "file" -> GopherFileType
-                                            _ -> error "unsupported renderAs" -- FIXME: bad error.
-                       Nothing -> parseType
-      variablePairs <- traverse toVariablePairs frontMatter
-      let recipeFrontMatterChanges = defaultRecipe
-            { frrSubstitutions = dataForMustacheWithFrontmatter frontMatter variablePairs
-            , frrParseType = renderAs
-            , frrSkipMustache = fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
-            , frrSkipMarkdown = fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
-            }
-          frontMatterReturnPair = (>>= Just . flip (,) restOfDocument)
-      case templateToUse of
-        Nothing ->
-          pure (recipeFrontMatterChanges, frontMatterReturnPair frontMatter)
-        Just templateName ->
-          let partial'sTemplatePath = "templates" </> templateName
-            -- FIXME, TODO: it feels like this is being done twice!
-              newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter frontMatter variablePairs
-              recipe = recipeFrontMatterChanges { frrIncludePartial = Just partial'sTemplatePath, frrSubstitutions = newDataForMustache }
-          in pure (recipe, frontMatterReturnPair frontMatter)
+  fileText <- TIO.readFile sourcePath
+  let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
+      templateToUse = frontMatter >>= fmParentTemplate
+      renderAs = case frontMatter >>= fmRenderAs of
+                   Just renderName -> case renderName of
+                                        "menu" -> GopherMenuType
+                                        "file" -> GopherFileType
+                                        _ -> error "unsupported renderAs" -- FIXME: bad error.
+                   Nothing -> contentType
+  variablePairs <- traverse toVariablePairs frontMatter
+  let recipeFrontMatterChanges = defaultRecipe
+        { frrSubstitutions = dataForMustacheWithFrontmatter frontMatter variablePairs
+        , frrContentType = renderAs
+        , frrSkipMustache = fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
+        , frrSkipMarkdown = fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
+        }
+      frontMatterReturnPair = (>>= Just . flip (,) restOfDocument)
+  case templateToUse of
+    Nothing ->
+      pure (recipeFrontMatterChanges, frontMatterReturnPair frontMatter)
+    Just templateName ->
+      let partial'sTemplatePath = "templates" </> templateName
+        -- FIXME, TODO: it feels like this is being done twice!
+          newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter frontMatter variablePairs
+          recipe = recipeFrontMatterChanges { frrIncludePartial = Just partial'sTemplatePath, frrSubstitutions = newDataForMustache }
+      in pure (recipe, frontMatterReturnPair frontMatter)
  where
   sourcePath :: FilePath
   sourcePath = sourceDirectory </> filePath
@@ -153,40 +157,37 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie (filePath, p
       else pure outputPath
 
 
-renderFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
-renderFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath, parseType) = do
-  (recipe, maybeFrontMatterAndRestOfDoc) <- createRenderRecipe sourceDirectory destinationDirectory spaceCookie sourceFile
-  if parseType == Skip
-    then do
-      _ <- noParseOut recipe
-      pure (fst sourceFile, Nothing)
-    else do
-      fileText <- case maybeFrontMatterAndRestOfDoc of
-                    Nothing -> TIO.readFile (sourceDirectory </> filePath)
-                    Just (_, restOfDocument) -> pure restOfDocument
-      let frontMatter = maybeFrontMatterAndRestOfDoc >>= Just . fst
-
-      testContents <- if frrSkipMustache recipe
-        then pure fileText
-        else parseMustache fileText recipe :: IO T.Text
-
-      finalContents <- if frrSkipMarkdown recipe
-        then pure testContents
-        else parseMarkdown recipe testContents :: IO T.Text
-
-      let filePathToWriteTo = frrOutPath recipe
-      createDirectoryIfMissing True (takeDirectory filePathToWriteTo)
-      writeFile filePathToWriteTo (T.unpack finalContents) -- first time it's written
-      pure (fst sourceFile, frontMatter)
- where
+-- FIXME: note that "Skip" means to skip the render process and just copy the file.
+-- FIXME: rename, buildFile?
+buildFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
+buildFile sourceDirectory destinationDirectory _ sourceFile@(filePath, SimplyCopy) = do
   -- Don't parse; just copy the file to the target directory.
-  noParseOut :: FileRenderRecipe -> IO ()
-  noParseOut recipe = do
-    let destination = frrDestinationDirectory recipe </> filePath
-        destinationDirectory' = takeDirectory destination
-        source = frrSourceDirectory recipe </> filePath
-    createDirectoryIfMissing True destinationDirectory'
-    copyFile source destination
+  let destination = destinationDirectory </> filePath
+      destinationDirectory' = takeDirectory destination
+      source = sourceDirectory </> filePath
+  createDirectoryIfMissing True destinationDirectory'
+  copyFile source destination
+  pure (fst sourceFile, Nothing)
+buildFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath, RenderEngine contentType) = do
+  (recipe, maybeFrontMatterAndRestOfDoc) <- createRenderRecipe sourceDirectory destinationDirectory spaceCookie filePath contentType
+  fileText <- case maybeFrontMatterAndRestOfDoc of
+                Nothing -> TIO.readFile (sourceDirectory </> filePath)
+                Just (_, restOfDocument) -> pure restOfDocument
+  let frontMatter = maybeFrontMatterAndRestOfDoc >>= Just . fst
+
+  testContents <- if frrSkipMustache recipe
+    then pure fileText
+    else parseMustache fileText recipe :: IO T.Text
+
+  finalContents <- if frrSkipMarkdown recipe
+    then pure testContents
+    -- We're using the `ContentType` from the recipe in case it was overridden.
+    else parseMarkdown (frrContentType recipe) testContents :: IO T.Text
+
+  let filePathToWriteTo = frrOutPath recipe
+  createDirectoryIfMissing True (takeDirectory filePathToWriteTo)
+  writeFile filePathToWriteTo (T.unpack finalContents) -- first time it's written
+  pure (fst sourceFile, frontMatter)
 
 
 -- | All the settings for a function (`writeOutBasedOn`) to parse a file
@@ -201,8 +202,8 @@ data FileRenderRecipe = FileRenderRecipe
   , frrTemplateToRender :: FilePath
   -- ^ This is the path to the main file to parse, unless a partial is specified (frrIncludePartial). In the case
   -- a partial is specified, this is the path to the template/ partial file.
-  , frrParseType :: ParseType
-  -- ^ Which parser to use.
+  , frrContentType :: ContentType
+  -- ^ What kind of file in gopherspace are we building for?
   , frrOutPath :: FilePath
   -- ^ Where the parsed file shall be written out to.
   , frrIncludePartial :: Maybe FilePath
@@ -261,47 +262,27 @@ parseMustache mainText recipe = do
 
 
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
-parseMarkdown :: FileRenderRecipe -> T.Text -> IO T.Text
-parseMarkdown recipe contents =
-  case frrParseType recipe of
-    -- Parse the markdown text out as a text file to be served in gopherspace.
-    GopherFileType -> do
-      parseOutGopherFile
-    -- Parse the markdown text out as a gophermap/menu.
-    GopherMenuType -> do
-      parseOutGopherMenu
-    -- Do not parse this file. Simply copy the file to the new destination!
-    Skip -> do
-      error "parseMarkdown cannot be used on file types not intended for it."
- where
-  -- When used needs to specify the type. 
-  parseCommonmark testContents' = commonmarkWith defaultSyntaxSpec "test" testContents'
-
-  -- Parse the contents as a text file for gopherspace and write out to the target directory.
-  parseOutGopherFile :: IO T.Text
-  parseOutGopherFile = do
-    out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherFile))
-    case out of
-      Left parseError -> error $ show parseError
-      Right penv -> do
-        allTheAsciiFonts <- getAsciiFonts
-        let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = blankInlineOverrides }
-        let (GopherFile out') = runReader penv env
-        pure out'
-
-  -- Parse the contents as a Gopher menu/gophermap for gopherspace and write out to the target directory.
-  parseOutGopherMenu :: IO T.Text
-  parseOutGopherMenu = do
-    out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherFile))
-    case out of
-      Left parseError -> error $ show parseError
-      Right penv -> do
-        allTheAsciiFonts <- getAsciiFonts
-        -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
-        let inlineOverrides = InlineOverrides { overrideLink = Just createGopherMenuLink }
-        let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = inlineOverrides }
-        let (GopherFile out') = runReader penv env
-        pure out'
+parseMarkdown :: ContentType -> T.Text -> IO T.Text
+parseMarkdown GopherFileType contents = do
+  out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherFile))
+  case out of
+    Left parseError -> error $ show parseError
+    Right penv -> do
+      allTheAsciiFonts <- getAsciiFonts
+      let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = blankInlineOverrides }
+      let (GopherFile out') = runReader penv env
+      pure out'
+parseMarkdown GopherMenuType contents = do
+  out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherFile))
+  case out of
+    Left parseError -> error $ show parseError
+    Right penv -> do
+      allTheAsciiFonts <- getAsciiFonts
+      -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
+      let inlineOverrides = InlineOverrides { overrideLink = Just createGopherMenuLink }
+      let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = inlineOverrides }
+      let (GopherFile out') = runReader penv env
+      pure out'
 
 
 -- | The exposed function to parse and copy a directory's files out to a new directory which
@@ -309,6 +290,6 @@ parseMarkdown recipe contents =
 buildGopherhole :: FilePath -> FilePath -> Bool -> IO ()
 buildGopherhole sourceDir destDir spaceCookie = do
   sourceFiles <- getSourceFiles sourceDir :: IO [SourceFile]
-  filePathFrontMatter <- traverse (renderFile sourceDir destDir spaceCookie) sourceFiles
+  filePathFrontMatter <- traverse (buildFile sourceDir destDir spaceCookie) sourceFiles
   renderTagIndexes filePathFrontMatter
   renderMainPhlogIndex filePathFrontMatter
