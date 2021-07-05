@@ -30,11 +30,11 @@ Here is an ordered list:
 1. Second item
 1. Third item
 
-Here is an ordered list (starting at 2):
+Here is an ordered list (starting at 2, one paren):
 
-2. First item
-2. Second item
-2. Third item
+2) First item
+2) Second item
+2) Third item
 
 Here is an ordered list (roman numerals, lowercase, parens):
 
