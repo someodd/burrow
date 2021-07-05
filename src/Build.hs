@@ -59,7 +59,6 @@ data ContentType = GopherFileType
 -- to use by default, or if the file should only be copied.
 data BuildJobType = RenderEngine ContentType
                   -- ^ Decides which rendering process to go through...
-                  -- NOTE: for below: maybe better named "CopyOnly!"
                   | SimplyCopy
                   deriving (Show, Eq)
 
@@ -91,7 +90,7 @@ getSourceFiles sourceDirectory = do
 
 
 -- FIXME: this may result in the file being read twice.
--- | Create a `FileRenderRecipe` for rendering a file.
+-- | Create a `FileRenderRecipe` for rendering a file. Gets a file ready for being built.
 createRenderRecipe :: FilePath -> FilePath -> Bool -> FilePath -> ContentType -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
 createRenderRecipe sourceDirectory destinationDirectory spaceCookie filePath contentType = do
   outPath <- finalFilePath
@@ -182,7 +181,8 @@ buildFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath,
 
   finalContents <- if frrSkipMarkdown recipe
     then pure testContents
-    else parseMarkdown recipe testContents :: IO T.Text
+    -- We're using the `ContentType` from the recipe in case it was overridden.
+    else parseMarkdown (frrContentType recipe) testContents :: IO T.Text
 
   let filePathToWriteTo = frrOutPath recipe
   createDirectoryIfMissing True (takeDirectory filePathToWriteTo)
@@ -262,44 +262,27 @@ parseMustache mainText recipe = do
 
 
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
-parseMarkdown :: FileRenderRecipe -> T.Text -> IO T.Text
-parseMarkdown recipe contents =
-  case frrContentType recipe of
-    -- Parse the markdown text out as a text file to be served in gopherspace.
-    GopherFileType -> do
-      parseOutGopherFile
-    -- Parse the markdown text out as a gophermap/menu.
-    GopherMenuType -> do
-      parseOutGopherMenu
- where
-  -- When used needs to specify the type. 
-  parseCommonmark testContents' = commonmarkWith defaultSyntaxSpec "test" testContents'
-
-  -- Parse the contents as a text file for gopherspace and write out to the target directory.
-  parseOutGopherFile :: IO T.Text
-  parseOutGopherFile = do
-    out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherFile))
-    case out of
-      Left parseError -> error $ show parseError
-      Right penv -> do
-        allTheAsciiFonts <- getAsciiFonts
-        let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = blankInlineOverrides }
-        let (GopherFile out') = runReader penv env
-        pure out'
-
-  -- Parse the contents as a Gopher menu/gophermap for gopherspace and write out to the target directory.
-  parseOutGopherMenu :: IO T.Text
-  parseOutGopherMenu = do
-    out <- parseCommonmark contents :: IO (Either ParseError (ParseEnv GopherFile))
-    case out of
-      Left parseError -> error $ show parseError
-      Right penv -> do
-        allTheAsciiFonts <- getAsciiFonts
-        -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
-        let inlineOverrides = InlineOverrides { overrideLink = Just createGopherMenuLink }
-        let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = inlineOverrides }
-        let (GopherFile out') = runReader penv env
-        pure out'
+parseMarkdown :: ContentType -> T.Text -> IO T.Text
+parseMarkdown GopherFileType contents = do
+  out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherFile))
+  case out of
+    Left parseError -> error $ show parseError
+    Right penv -> do
+      allTheAsciiFonts <- getAsciiFonts
+      let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = blankInlineOverrides }
+      let (GopherFile out') = runReader penv env
+      pure out'
+parseMarkdown GopherMenuType contents = do
+  out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherFile))
+  case out of
+    Left parseError -> error $ show parseError
+    Right penv -> do
+      allTheAsciiFonts <- getAsciiFonts
+      -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
+      let inlineOverrides = InlineOverrides { overrideLink = Just createGopherMenuLink }
+      let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = inlineOverrides }
+      let (GopherFile out') = runReader penv env
+      pure out'
 
 
 -- | The exposed function to parse and copy a directory's files out to a new directory which
