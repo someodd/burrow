@@ -1,4 +1,3 @@
--- FIXME: maybe use the filepath library to ensure slashes in the right place, for consistency, avoiding terrible bugs
 -- FIXME: there needs to be a consistent name for the Burrow partial/template system: parentTemplate.
 -- actual file being parsed which uses the parser.
 {-# LANGUAGE OverloadedStrings          #-}
@@ -76,7 +75,7 @@ getSourceFiles :: FilePath -> IO [SourceFile]
 getSourceFiles sourceDirectory = do
   config <- getConfig
   dontSkipThese <- fmap words $ getConfigValue config "general" "buildExtensions"
-  filesMatching <- getDirectoryFiles sourceDirectory ["**/*"]
+  filesMatching <- getDirectoryFiles sourceDirectory ["**" </> "*"]
   pure $ fmap (\x -> (x, getBuildJobType dontSkipThese x)) filesMatching
  where
   getBuildJobType :: [String] -> FilePath -> BuildJobType
@@ -86,7 +85,7 @@ getSourceFiles sourceDirectory = do
     | otherwise = SimplyCopy
    where
      dontSkipMenuExtensions = map (".menu" <.>) dontSkipThese
-     dontSkipExtensions = map ("." ++) dontSkipThese
+     dontSkipExtensions = map ("" <.>) dontSkipThese
 
 
 -- FIXME: this may result in the file being read twice.
@@ -114,7 +113,7 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie filePath con
                    Just renderName -> case renderName of
                                         "menu" -> GopherMenuType
                                         "file" -> GopherFileType
-                                        _ -> error "unsupported renderAs" -- FIXME: bad error.
+                                        _ -> error "unsupported renderAs" -- FIXME: bad error. fix with errata, like FrontMatter has.
                    Nothing -> contentType
   variablePairs <- traverse toVariablePairs frontMatter
   let recipeFrontMatterChanges = defaultRecipe
