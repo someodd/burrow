@@ -35,22 +35,13 @@ import qualified Text.Mustache.Types as Mtype
 
 import Control.Monad.Reader
 
+import Types (ContentType(..))
 import Config
 import FrontMatter (toVariablePairs)
 import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter(..), getFrontMatter, FileFrontMatter)
 import TextUtils.Headings
 import Markdown
 import Mustache
-
-
--- | Content type that the builder recognizes/finds useful in the build
--- process. This describes the kind of file it will be as an end product in the
--- gopherhole.
-data ContentType = GopherFileType
-                 -- ^ Parse to plaintext ASCII-art-style file.
-                 | GopherMenuType
-                 -- ^ Will not be parsed! Will simply be copied.
-                 deriving (Show, Eq)
 
 
 -- | The content type in gopherspace as far as the renderer is concerned. This
@@ -91,6 +82,7 @@ getSourceFiles sourceDirectory = do
 -- FIXME: this may result in the file being read twice.
 -- | Create a `FileRenderRecipe` for rendering a file. Gets a file ready for being built.
 createRenderRecipe :: FilePath -> FilePath -> Bool -> FilePath -> ContentType -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
+-- contentType argument should be renamed to defaultContentType FIXME
 createRenderRecipe sourceDirectory destinationDirectory spaceCookie filePath contentType = do
   outPath <- finalFilePath
   let defaultRecipe = FileRenderRecipe
@@ -110,10 +102,7 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie filePath con
   let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
       templateToUse = frontMatter >>= fmParentTemplate
       renderAs = case frontMatter >>= fmRenderAs of
-                   Just renderName -> case renderName of
-                                        "menu" -> GopherMenuType
-                                        "file" -> GopherFileType
-                                        _ -> error "unsupported renderAs" -- FIXME: bad error. fix with errata, like FrontMatter has.
+                   Just contentTypeOverride -> contentTypeOverride
                    Nothing -> contentType
   variablePairs <- traverse toVariablePairs frontMatter
   let recipeFrontMatterChanges = defaultRecipe
