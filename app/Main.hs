@@ -13,9 +13,15 @@ import Data.Version (showVersion)
 -- if out-dir is specified, output to directory and not std-out. must be specified
 -- if source is directory. specify destination to not use stdout or if
 -- the source is a directory
-data Opts = Opts
-  { optSpacecookie :: Bool -- Use .gopher
+data BuildOptions = BuildOptions
+  { buildSpacecookie :: Bool -- Use .gopher
   }
+
+data Command
+  = Build BuildOptions
+
+
+data MainInterface = { mainCommand :: Command }
 
 -- FIXME: make it so build is only one of many options/actions. you can also create phlog posts and list tags. Use a phlog post template?
 -- TODO/FIXME:
@@ -23,20 +29,23 @@ data Opts = Opts
 -- in order to create directories and files for gopherspace, respectively.
 main :: IO ()
 main = do
-  opts <- execParser optsParser
-  buildGopherhole (optSpacecookie opts)
+  opts <- execParser parser
+  case opts of
+    Build buildOptions -> buildGopherhole (buildSpacecookie buildOptions)
  where
-  optsParser :: ParserInfo Opts
-  optsParser =
+  parser :: ParserInfo MainInterface
+  parser =
     info
-      (helper <*> versionOption <*> programOptions)
-      (fullDesc <> progDesc "burrow " <>
-       header "burrow: build gopherholes using Mustache and Markdown")
+      (helper <*> versionOption <*> (Build <$> buildParser))
+      (fullDesc <>        header "burrow: build gopherholes using Mustache and Markdown")
 
   versionOption :: Parser (a -> a)
   versionOption = infoOption (showVersion version) (long "version" <> help "Show version")
 
-  programOptions =
-    Opts <$>
-    switch
-      (long "spacecookie" <> help "Parse index.md.mustache files to .gophermap files")
+  buildParser =
+    hsubparser (command "build" (info buildOptions (progDesc "Build a gopherhole according to gopherhole.ini")))
+   where
+    buildOptions =
+      BuildOptions <$>
+      switch
+        (long "spacecookie" <> help "Parse index.md.mustache files to .gophermap files")
