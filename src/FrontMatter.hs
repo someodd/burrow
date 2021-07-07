@@ -30,6 +30,7 @@ import Data.Text.Encoding         as T
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 
+import Types (ContentType(..))
 import Config (getConfig, getConfigValue)
 
 
@@ -57,6 +58,26 @@ tagParseError' frontMatterRaw filePath parseError = do
       , errataBody = Just parseError
       }
     ]
+
+
+contentTypeParseError :: T.Text -> FrontMatterError
+contentTypeParseError badRenderAs = FrontMatterError $ [text|
+There was a problem in your frontmatter!
+
+You defined this `renderAs`:
+
+  $badRenderAs
+
+The only valid values for `renderAs` are:
+
+  * menu: for gophermaps/menus in gopherspace
+  * file: for regular text files in gopherspace
+
+Suggestions:
+
+  * Remove the `renderAs`
+  * Set the `renderAs` to a valid value as described above
+|]
 
 
 dateTimeParseError :: T.Text -> T.Text -> FrontMatterError
@@ -160,7 +181,7 @@ data FrontMatter = FrontMatter
   , fmParentTemplate :: Maybe FilePath
   -- ^ Embed the file inside another template by the path mentioned. If set,
   -- this setting will override the setting derived from file extension name.
-  , fmRenderAs :: Maybe T.Text
+  , fmRenderAs :: Maybe ContentType
   -- ^ Can render as "file" or "menu." Overrides settings derived from file name.
   } deriving (Show)
 
@@ -197,8 +218,15 @@ instance FromJSON FrontMatter where
     <*> o .:? "skipMustache"
     <*> o .:? "skipMarkdown"
     <*> o .:? "parentTemplate"
-    <*> o .:? "renderAs" -- FIXME: should check if belongs in list or errors...
+    <*> (o .:? "renderAs" >>= \maybeInsideParser -> either (fail . show) pure (traverse makeRenderAs maybeInsideParser))
    where
+    -- | Make the renderAs front matter value into a `ContentType` or error if the
+    -- value is unrecognized.
+    makeRenderAs :: Value -> Either FrontMatterError ContentType
+    makeRenderAs (String "menu") = Right GopherMenuType
+    makeRenderAs (String "file") = Right GopherFileType
+    makeRenderAs someValue = Left $ contentTypeParseError (T.pack . show $ someValue)
+
     -- | Convert a parser value into a datetime object or fail!
     --
     -- For a monadic operation inside parser. The bind operation from (o .:? "publish")
