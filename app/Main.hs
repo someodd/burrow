@@ -14,18 +14,17 @@ import Data.Version (showVersion)
 -- if source is directory. specify destination to not use stdout or if
 -- the source is a directory
 data Opts = Opts
-  { optSourceDir :: !FilePath -- Should be a FilePath
-  , optDestDir :: !FilePath -- Should be a FilePath
-  , optSpacecookie :: Bool -- Use .gopher
+  { optSpacecookie :: Bool -- Use .gopher
   }
 
+-- FIXME: make it so build is only one of many options/actions. you can also create phlog posts and list tags. Use a phlog post template?
 -- TODO/FIXME:
 -- Need to instead glob the input directory for *.txt.mustache first, then *.md.mustache
 -- in order to create directories and files for gopherspace, respectively.
 main :: IO ()
 main = do
   opts <- execParser optsParser
-  buildGopherhole (optSourceDir opts) (optDestDir opts) (optSpacecookie opts)
+  buildGopherhole (optSpacecookie opts)
  where
   optsParser :: ParserInfo Opts
   optsParser =
@@ -38,9 +37,6 @@ main = do
   versionOption = infoOption (showVersion version) (long "version" <> help "Show version")
 
   programOptions =
-    Opts <$> strOption (long "source" <> metavar "DIR" <> help "Directory to parse.") <*>
-    strOption
-      (long "destination" <> metavar "DIR" <>
-       help "The directory to output to (will be created if does not exist).") <*>
+    Opts <$>
     switch
       (long "spacecookie" <> help "Parse index.md.mustache files to .gophermap files")
