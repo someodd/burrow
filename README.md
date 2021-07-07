@@ -6,7 +6,7 @@ There's an example gopherhole (with a default config in `data/gopherhole.ini`)
 you can build with these command and then visit `localhost:7070` in `gopher`:
 
 ```
-cabal run burrow -- --spacecookie
+cabal run burrow -- build --spacecookie
 cd built
 spacecookie ../data/spacecookie.json
 ```
