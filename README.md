@@ -2,10 +2,11 @@
 
 Burrow is a *static site generator,* but for gopherholes. A *gopherhole* is a place in *gopherspace* accessed through the [Gopher protocol](https://en.wikipedia.org/wiki/Gopher_%28protocol%29)).
 
-There's an example gopherhole you can build with these command and then visit `localhost:7070` in `gopher`:
+There's an example gopherhole (with a default config in `data/gopherhole.ini`)
+you can build with these command and then visit `localhost:7070` in `gopher`:
 
 ```
-cabal run burrow -- --source example-gopherhole/ --destination built/ --spacecookie
+cabal run burrow -- --spacecookie
 cd built
 spacecookie ../data/spacecookie.json
 ```

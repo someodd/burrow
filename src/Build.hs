@@ -273,10 +273,15 @@ parseMarkdown GopherMenuType contents = do
       pure out'
 
 
+-- FIXME: also in gopherhole.ini: consistently use "buildToPath" instead of "destPath" or
+-- anything else.
 -- | The exposed function to parse and copy a directory's files out to a new directory which
 -- can be served via the Gopher protocol.
-buildGopherhole :: FilePath -> FilePath -> Bool -> IO ()
-buildGopherhole sourceDir destDir spaceCookie = do
+buildGopherhole :: Bool -> IO ()
+buildGopherhole spaceCookie = do
+  config <- getConfig
+  sourceDir <- getConfigValue config "general" "sourcePath"
+  destDir <- getConfigValue config "general" "buildPath"
   sourceFiles <- getSourceFiles sourceDir :: IO [SourceFile]
   filePathFrontMatter <- traverse (buildFile sourceDir destDir spaceCookie) sourceFiles
   renderTagIndexes filePathFrontMatter
