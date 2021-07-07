@@ -8,6 +8,11 @@ import Options.Applicative hiding (ParseError)
 import Paths_burrow (version)
 import Data.Version (showVersion)
 
+parserPrefs :: ParserPrefs
+parserPrefs = defaultPrefs
+  { prefShowHelpOnEmpty = True
+  }
+
 -- bad practice (should have options be a separate type
 data SubCommand
   = Build { buildSpacecookie :: Bool }
@@ -46,6 +51,6 @@ mainParser = info (helper <*> versionOption <*> mainCommand)
 -- FIXME: make it so build is only one of many options/actions. you can also create phlog posts and list tags. Use a phlog post template?
 main :: IO ()
 main = do
-  opts <- execParser mainParser
+  opts <- customExecParser parserPrefs mainParser
   case subcommand opts of
     Build buildOptions -> buildGopherhole (buildOptions)
