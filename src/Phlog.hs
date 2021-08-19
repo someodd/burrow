@@ -260,11 +260,14 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
   renderAtom (MainPhlogIndex mainPhlogIndex) = do
     currentYear <- getCurrentYear
     phlogConfig <- getPhlogConfig
+    config <- getConfig
+    buildPath <- getConfigValue config "general" "buildPath"
     let phlogIndex = runReader mainPhlogIndex currentYear
+        phlogDirectory = phlogPath phlogConfig
         -- FIXME
-        atomFeed = (createAtomFeed $ AtomFeedRecipe {atomTitle="All Posts", atomEntries=phlogIndex, atomPhlogConfig=phlogConfig, atomPath="phlog/main.xml"})
-    createDirectoryIfMissing True "built/phlog/"
-    XML.writeFile def "built/phlog/main.xml" atomFeed
+        atomFeed = (createAtomFeed $ AtomFeedRecipe {atomTitle="All Posts", atomEntries=phlogIndex, atomPhlogConfig=phlogConfig, atomPath=phlogDirectory </> "main.xml"})
+    createDirectoryIfMissing True (buildPath </> phlogDirectory)
+    XML.writeFile def (buildPath </> phlogDirectory </> "main.xml") atomFeed
 
 
 renderMainPhlogIndex :: [FileFrontMatter] -> IO ()
