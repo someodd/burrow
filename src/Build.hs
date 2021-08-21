@@ -252,25 +252,22 @@ parseMustache mainText recipe = do
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
 parseMarkdown :: ContentType -> T.Text -> IO T.Text
 parseMarkdown GopherFileType contents = do
-  out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherFile))
+  out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherPage))
   case out of
     Left parseError -> error $ show parseError
     Right penv -> do
       allTheAsciiFonts <- getAsciiFonts
-      let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = blankInlineOverrides }
-      let (GopherFile out') = runReader penv env
-      pure out'
+      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = False, envPreserveLineBreaks = True }
+      pure . gopherMenuToText False $ (runReader penv env :: GopherPage)
 parseMarkdown GopherMenuType contents = do
-  out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherFile))
+  out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherPage))
   case out of
     Left parseError -> error $ show parseError
     Right penv -> do
       allTheAsciiFonts <- getAsciiFonts
       -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
-      let inlineOverrides = InlineOverrides { overrideLink = Just createGopherMenuLink }
-      let env = Environment { envFonts = allTheAsciiFonts, envInlineOverrides = inlineOverrides }
-      let (GopherFile out') = runReader penv env
-      pure out'
+      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = True, envPreserveLineBreaks = True }
+      pure . gopherMenuToText True $ (runReader penv env :: GopherPage)
 
 
 -- FIXME: also in gopherhole.ini: consistently use "buildToPath" instead of "destPath" or
