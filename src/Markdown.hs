@@ -15,6 +15,7 @@ module Markdown
   , GopherPage(..)
   ) where
 
+import Data.Maybe (isJust)
 import Data.Foldable (fold)
 import Data.Char (toLower)
 import Data.List (groupBy, intercalate, intersperse)
@@ -33,7 +34,10 @@ import TextUtils (italicize, embolden)
 data Environment =
   Environment
     { envFonts :: HeadingLevelFontMap
-    , envMenuLinks :: Bool
+    -- ^ Used to render headings.
+    , envMenuLinks :: Maybe (Text, Text)
+    -- ^ If nothing will assume a plain text file, won't do anything particular
+    -- for links. If defined will use the host and port.
     , envPreserveLineBreaks :: Bool
     --, envInlineOverrides :: InlineOverrides
     }
@@ -55,25 +59,26 @@ parseHeading' level fonts ils = T.pack $ headingCompose font $ show ils
 
 -- | Make a Gopher link according to the Gopher spec (RFC 1496 I think) for a
 -- gophermap.
-createGopherPageLink :: Text -> Text -> Text -> Text
-createGopherPageLink target title label =
+createGopherPageLink :: (Text, Text) -> Text -> Text -> Text -> Text
+createGopherPageLink (host, port) target title label =
   determineLinkType
  where
-  intercalateLink :: Text -> Text -> Text
-  intercalateLink itemType newTarget =
+  intercalateLink :: Text -> Text -> Maybe (Text, Text) -> Text
+  intercalateLink itemType newTarget maybeHostAndPort =
     let title' = if T.null title then "" else " (" <> title <> ")"
-    in T.intercalate "" [itemType, label <> title' :: Text, "\t", newTarget]
+        addHostPort = if isJust maybeHostAndPort then (++ ["\t", host, "\t", port]) else id
+    in T.intercalate "" $ addHostPort [itemType, label <> title' :: Text, "\t", newTarget]
 
   -- FIXME: rename or refactor!
   -- FIXME: should use leading indicators too like /0/ or /1/
   determineLinkType :: Text
   determineLinkType
     -- Link to an HTTP web page.
-    | "https" `T.isPrefixOf` target = intercalateLink "h" ("URL:" <> target)
+    | "https" `T.isPrefixOf` target = intercalateLink "h" ("URL:" <> target) Nothing
     -- Link to a plaintext file in gopherspace.
-    | ".txt" `T.isSuffixOf` target = intercalateLink "1" target
+    | ".txt" `T.isSuffixOf` target = intercalateLink "1" target (Just (host, port))
     -- Anything else is assumed to be a link to another gophermap/menu.
-    | otherwise = intercalateLink "0" target
+    | otherwise = intercalateLink "0" target (Just (host, port))
 
 
 -- | DO NOT USE
@@ -109,12 +114,15 @@ instance HasAttributes (ParseEnv GopherPage) where
   addAttributes _ x = x
 
 
+-- FIXME: could even take the environment instead of that bool to simplify usage/less moving parts/less to go wrong.
 -- | Convert the representation created by the `commonmark` parser into `Text`.
-gopherMenuToText :: Bool -> GopherPage -> Text
+gopherMenuToText :: Environment -> GopherPage -> Text
 gopherMenuToText _ NullBlock = ""
-gopherMenuToText menuMagic (Block t) =
+gopherMenuToText environment (Block t) =
   blankLineReplacements $ T.intercalate "" $ map gopherLineToText $ reduceNewLines . linkSpacing $ filter (/= NullLine) $ map joinTokens $ groupIncompleteLines t
  where
+  menuMagic = isJust $ envMenuLinks environment
+
   blankLineReplacements = if menuMagic then T.replace "\n\n" "\ni \n" else id
 
   predicate (InfoLineToken _) (InfoLineToken _) = True
@@ -254,15 +262,16 @@ instance Rangeable (ParseEnv GopherPage) => IsInline (ParseEnv GopherPage) where
   link target title penv = do
     environment <- ask
     let menuLinks = envMenuLinks environment
-    if menuLinks then do
+    maybe penv makeLink menuLinks
+   where
+     makeLink (host, port) = do
       gopher <- penv
       case gopher of
         -- FIXME: label from ils messed up.
         (Block gopherLines) -> 
-          let linkText = createGopherPageLink target title (combineLines gopherLines) -- FIXME
+          let linkText = createGopherPageLink (host, port) target title (combineLines gopherLines) -- FIXME
           in pure $ Block [LinkLine linkText]
         NullBlock -> pure NullBlock
-    else penv
 
   image _ _ ils = ils
   -- could use a weird "font" for code? TODO

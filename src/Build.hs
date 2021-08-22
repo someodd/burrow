@@ -257,17 +257,20 @@ parseMarkdown GopherFileType contents = do
     Left parseError -> error $ show parseError
     Right penv -> do
       allTheAsciiFonts <- getAsciiFonts
-      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = False, envPreserveLineBreaks = True }
-      pure . gopherMenuToText False $ (runReader penv env :: GopherPage)
+      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = Nothing, envPreserveLineBreaks = True }
+      pure . gopherMenuToText env $ (runReader penv env :: GopherPage)
 parseMarkdown GopherMenuType contents = do
   out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherPage))
+  config <- getConfig
+  host <- T.pack <$> getConfigValue config "general" "host"
+  port <- T.pack <$> getConfigValue config "general" "port"
   case out of
     Left parseError -> error $ show parseError
     Right penv -> do
       allTheAsciiFonts <- getAsciiFonts
       -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
-      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = True, envPreserveLineBreaks = True }
-      pure . gopherMenuToText True $ (runReader penv env :: GopherPage)
+      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = Just (host, port), envPreserveLineBreaks = True }
+      pure . gopherMenuToText env $ (runReader penv env :: GopherPage)
 
 
 -- FIXME: also in gopherhole.ini: consistently use "buildToPath" instead of "destPath" or
