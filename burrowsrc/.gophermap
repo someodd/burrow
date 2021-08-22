@@ -1,0 +1,70 @@
+
+┌─────────────────────────────────────────────┐
+│           __   ___  __   __   ___           │▒
+│ |__| \ / |__) |__  |__) |__) |__   /\  |    │▒
+│ |  |  |  |    |___ |  \ |  \ |___ /~~\ |___ │▒
+│        __   __   __        ___  __          │▒ 
+│       / _` /  \ |__) |__| |__  |__)         │▒
+│       \__> \__/ |    |  | |___ |  \         │▒
+│                                             │▒ 
+├─────────────────────────────────────────────┤▒ 
+│                                             │▒ 
+│ Welcome to my hidden gopherhole! My name is │▒
+│ Hyperreal Gopher.                           │▒
+│                                             │▒ 
+└─────────────────────────────────────────────┘▒
+ ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+
+Matrix: hyperrealgopher:privacytools.io
+Email: hyperrealgopher@protonmail.ch.
+hGithub: @hyperrealgopher	URL:https://github.com/hyperrealgopher
+hMastodon: @hyperrealgopher@fosstodon.org	URL:https://fosstodon.org/@hyperrealgopher
+1Phlog	/phlog
+
+
+┌─────────────────────────────────────────────┐
+│    _____             _                      │▒
+│   |   __|___ ___ ___| |_ ___ ___ ___ _ _    │▒
+│   |__   | . | -_| .'| '_| -_| .'|_ -| | |   │▒
+│   |_____|  _|___|__,|_,_|___|__,|___|_  |   │▒
+├─────────|_|─────────────────────────|___|───┤▒
+│      Tor-and-invite-only IRC/ZNC Server     │▒
+└─────────────────────────────────────────────┘▒
+ ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+                                                
+On this .onion there is a privacy-focused
+IRC server which can only be accessed via
+Tor and an account I create for you (ZNC).
+
+Feel free to contact me to get an account.
+
+hSpeakeasy Docker setup on GitHub	URL:https://github.com/hyperrealgopher/speakeasy
+0Connection info	/irc-connection-info.txt
+
+
+┌─────────────────────────────────────────────┐
+│          _____         _                    │▒
+│         |   __|___ ___| |_ ___ ___          │▒
+│         |  |  | . | . |   | -_|  _|         │▒
+│         |_____|___|  _|_|_|___|_|           │▒
+├───────────────────|_|───────────────────────┤▒
+│         My Gopher Protocol Stuff            │▒
+└─────────────────────────────────────────────┘▒
+ ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+
+I maintain a list of gopherholes I like. I may
+even feature some in my phlog:
+
+1My favorite gopherholes	/favorite-gopherholes.menu.md
+
+I made a Gopher client called "Waffle:"
+
+hWaffle on Github	URL:https://github.com/hyperrealgopher/waffle
+hWaffle room on Matrix	URL:https://matrix.to/#/!ErxkIgxbsTfPysApWD:privacytools.io?via=privacytools.io
+
+I also made a gopherhole builder named "Burrow:"
+
+hBurrow on GitHub	URL:https://github.com/hyperrealgopher/burrow
+
+hThis gopherhole proudly served using spacecookie	URL:https://github.com/sternenseemann/spacecookie
+hMy spacecookie Docker configuration	URL:https://github.com/hyperrealgopher/docker-spacecookie
