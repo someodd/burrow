@@ -1,0 +1,134 @@
+
+  ____                   _                                   
+ / ___| _ __   ___  __ _| | _____  __ _ ___ _   _            
+ \___ \| '_ \ / _ \/ _` | |/ / _ \/ _` / __| | | |           
+  ___) | |_) |  __/ (_| |   <  __/ (_| \__ \ |_| |           
+ |____/| .__/ \___|\__,_|_|\_\___|\__,_|___/\__, |           
+  / ___|_|_  _ __  _ __   ___  ___| |_(_) __|___/__          
+ | |   / _ \| '_ \| '_ \ / _ \/ __| __| |/ _ \| '_ \         
+ | |__| (_) | | | | | | |  __/ (__| |_| | (_) | | | |        
+  \____\___/|_| |_|_| |_|\___|\___|\__|_|\___/|_| |_|        
+ |_ _|_ __  / _| ___  _ __ _ __ ___   __ _| |_(_) ___  _ __  
+  | || '_ \| |_ / _ \| '__| '_ ` _ \ / _` | __| |/ _ \| '_ \ 
+  | || | | |  _| (_) | |  | | | | | | (_| | |_| | (_) | | | |
+ |___|_| |_|_|  \___/|_|  |_| |_| |_|\__,_|\__|_|\___/|_| |_|
+                                                             
+IRC server which only allows connections from ZNC accounts the admin has added.
+The ZNC can only be connected to via Tor.
+
+If you're new to IRC I strongly recommend Hexchat. In fact, a lot of this guide
+will hand-hold you through getting set up in any Debian variant Linux distro.
+
+# Test
+
+I also like Weechat.
+
+
+ _____     _              _____         
+|   __|___| |_ _ _ ___   |_   _|___ ___ 
+|__   | -_|  _| | | . |    | | | . |  _|
+|_____|___|_| |___|  _|    |_| |___|_|  
+                  |_|                   
+
+You can only connect to the ZNC account created for you using Tor. Tor anonymizes
+you and it anonymizes the server. It also offers end-to-end encryption.
+
+Please make sure you have Tor installed:
+
+`sudo apt install tor`
+
+In your IRC client you'll want to set the proxy settings to hostname 127.0.0.1
+and port 9050 using SOCKS5, for all connections.
+
+To setup Tor in Hexchat look at the menu bar of the main Hexchat window and go
+to settings, then click "preferences" from the menu that appears. Then in the
+left pane click "network setup" and under *proxy sever* enter in the hostname,
+port, and set type to SOCKS5. Set "use proxy for all connections."
+
+**NOTE:** for Windows the port is 9150.
+
+                                                    
+ _____                     _   _            _       
+|     |___ ___ ___ ___ ___| |_|_|___ ___   | |_ ___ 
+|   --| . |   |   | -_|  _|  _| |   | . |  |  _| . |
+|_____|___|_|_|_|_|___|___|_| |_|_|_|_  |  |_| |___|
+                                    |___|           
+                    _____ _____ _____               
+ _ _ ___ _ _ ___   |__   |   | |     |              
+| | | . | | |  _|  |   __| | | |   --|              
+|_  |___|___|_|    |_____|_|___|_____|              
+|___|                                               
+ _____                     _                        
+|  _  |___ ___ ___ _ _ ___| |_                      
+|     |  _|  _| . | | |   |  _|                     
+|__|__|___|___|___|___|_|_|_|                       
+                                                    
+You connect to the IRC server through a ZNC account created for you.
+
+  * Host: hyperzzzk4zxiyghqnkrgi67hmqn2tr7ju4zoyi3hlzapm3pxh5vkhqd.onion
+  * Port: 6667
+
+So in Hexchat:
+
+  1. In the network list, *add* a new network, call it "Speakeasy."
+  2. Click "edit" on the new network you added (the one you called "Speakeasy")
+  3. you'll look at the *servers* tab, click "add" and then enter:
+     `hyperzzzk4zxiyghqnkrgi67hmqn2tr7ju4zoyi3hlzapm3pxh5vkhqd.onion/6667`
+  4. Check "connect to this network automatically"
+  5. Enter your username I gave you for your *nick name*
+  6. Enter whatever for *second choice*
+  7. Enter whatever for *real name*
+  8. Enter your username I gave you for your *user name*
+  9. Change the *login method* drop down to *server password (/PASS)*
+ 10. Set the *password* to the password I gave you for your user account!
+
+Side note: if you have a weird client/want to identify manually you can use the
+command `/quote PASS someuser:somepassword`.
+
+                                              
+ _____                 _    _____ _____ _____ 
+| __  |___ ___ _ _ ___|_|  |     |_   _| __  |
+| __ -| . |   | | |_ -|_   |  |  | | | |    -|
+|_____|___|_|_|___|___|_|  |_____| |_| |__|__|
+                                              
+Go the extra mile and install OTR for your client. If you're using Hexchat I
+strongly recommend [hexchat-otr](https://github.com/TingPing/hexchat-otr),
+which you can install in Debian with `sudo apt install hexchat-otr`.
+
+Read the readme here: https://github.com/TingPing/hexchat-otr
+
+
+ _ _ _             _       _   
+| | | |___ ___ ___| |_ ___| |_ 
+| | | | -_| -_|  _|   | .'|  _|
+|_____|___|___|___|_|_|__,|_|  
+                               
+Here are some tips for connecting using the Weechat IRC client:
+
+  /set irc.server.default.nicks "zncusername"
+  /server add speakeasy hyperzzzk4zxiyghqnkrgi67hmqn2tr7ju4zoyi3hlzapm3pxh5vkhqd.onion
+  /set irc.server.speakeasy.autoconnect on
+  /set irc.server.speakeasy.addresses "hyperzzzk4zxiyghqnkrgi67hmqn2tr7ju4zoyi3hlzapm3pxh5vkhqd.onion/6667"
+  /proxy add tor socks5 127.0.0.1 9050
+  /set irc.server.speakeasy.proxy "tor"
+  /set irc.server.speakeasy.username "zncusername"
+  /set irc.server.speakeasy.password zncusername:zncpassword
+  /connect speakeasy
+
+There's another way to do this so i don't have to `/quote pass ****` it looks
+like `/set irc.server.freenode.sasl_password "${sec.data.freenode_password}"`
+
+Also check out:
+
+  /secure passphrase *********************************
+  /secure set speakeasy_password *********************************
+
+Other useful docs:
+
+  * https://weechat.org/files/doc/devel/weechat_faq.en.html
+  * https://trac.torproject.org/projects/tor/wiki/doc/TorifyHOWTO/WeeChat
+  * https://weechat.org/files/doc/stable/weechat_quickstart.en.html
+  * https://kmacphail.blogspot.com/2011/09/using-weechat-with-freenode-basics.html
+  * https://weechat.org/files/doc/stable/weechat_quickstart.en.html
+  * https://weechat.org/files/doc/stable/weechat_user.en.html
+
