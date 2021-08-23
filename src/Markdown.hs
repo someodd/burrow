@@ -39,7 +39,8 @@ data Environment =
     -- ^ If nothing will assume a plain text file, won't do anything particular
     -- for links. If defined will use the host and port.
     , envPreserveLineBreaks :: Bool
-    --, envInlineOverrides :: InlineOverrides
+    , envBucktooth :: Bool
+    -- ^ use the bucktooth/spacecookie format of .gophermap menus.
     }
 
   
@@ -73,8 +74,12 @@ createGopherPageLink (host, port) target title label =
   -- FIXME: should use leading indicators too like /0/ or /1/
   determineLinkType :: Text
   determineLinkType
+    -- Link to an external gopher resource
+    | "gopher" `T.isPrefixOf` target = do
+      -- FIXME: parse gopher link into its parts host, port, resource
+      error "IMPLEMENT ME SOON!"
     -- Link to an HTTP web page.
-    | "https" `T.isPrefixOf` target = intercalateLink "h" ("URL:" <> target) Nothing
+    | "http" `T.isPrefixOf` target = intercalateLink "h" ("URL:" <> target) Nothing
     -- Link to a plaintext file in gopherspace.
     | ".txt" `T.isSuffixOf` target = intercalateLink "1" target (Just (host, port))
     -- Anything else is assumed to be a link to another gophermap/menu.
@@ -114,16 +119,17 @@ instance HasAttributes (ParseEnv GopherPage) where
   addAttributes _ x = x
 
 
--- FIXME: could even take the environment instead of that bool to simplify usage/less moving parts/less to go wrong.
--- | Convert the representation created by the `commonmark` parser into `Text`.
 gopherMenuToText :: Environment -> GopherPage -> Text
 gopherMenuToText _ NullBlock = ""
 gopherMenuToText environment (Block t) =
   blankLineReplacements $ T.intercalate "" $ map gopherLineToText $ reduceNewLines . linkSpacing $ filter (/= NullLine) $ map joinTokens $ groupIncompleteLines t
  where
+  infoLineSuffixMenuMagic = "\tfake\t(NULL)\t0"
+  infoSuffixConditional = if menuMagic && not bucktooth then infoLineSuffixMenuMagic else ""
   menuMagic = isJust $ envMenuLinks environment
+  bucktooth = envBucktooth environment
 
-  blankLineReplacements = if menuMagic then T.replace "\n\n" "\ni \n" else id
+  blankLineReplacements = if menuMagic && not bucktooth then T.replace "\n\n" ("\ni " <> infoSuffixConditional <> "\n") else id
 
   predicate (InfoLineToken _) (InfoLineToken _) = True
   predicate _ _ = False
@@ -132,9 +138,9 @@ gopherMenuToText environment (Block t) =
     groupBy predicate gopherLines
 
   joinTokens :: [GopherLine] -> GopherLine
-  joinTokens [InfoLineToken l] = CompleteInfoLine l
+  joinTokens [InfoLineToken l] = CompleteInfoLine $ l <> infoSuffixConditional
   joinTokens incompleteLines@(InfoLineToken _:_) =
-    let (InfoLineToken token) = (fold incompleteLines :: GopherLine) in CompleteInfoLine token
+    let (InfoLineToken token) = (fold incompleteLines :: GopherLine) in CompleteInfoLine $ token <> infoSuffixConditional
   joinTokens [x] = x
   joinTokens _ = error "should be impossible! FIXME!" -- FIXME
 
@@ -145,7 +151,7 @@ gopherMenuToText environment (Block t) =
    where
     foo acc@(_:_) GopherNewLine =
       case last acc of
-        GopherNewLine -> init acc ++ [CompleteInfoLine $ if menuMagic then "\ni \n" else "\n\n"]
+        GopherNewLine -> init acc ++ [CompleteInfoLine $ if menuMagic then "\ni " <> infoLineSuffixMenuMagic <> "\n" else "\n\n"]
         (CompleteInfoLine i) -> init acc ++ [CompleteInfoLine $ i <> "\n"]
         (LinkLine link') -> init acc ++ [LinkLine $ link' <> "\n"]
         a -> acc ++ [a]
@@ -171,7 +177,7 @@ gopherMenuToText environment (Block t) =
       NullLine -> ""
       GopherNewLine -> ""
       -- NOTE: there's a tab filter here because tabs will break info lines in the future spacecookie
-      (CompleteInfoLine l) -> ((if menuMagic then "i" else "") <>) . T.filter (/= '\t') $ l
+      (CompleteInfoLine l) -> ((if menuMagic && not bucktooth then "i" else "") <>) $ l
       (InfoLineToken l) -> l
       (LinkLine l) -> l
 

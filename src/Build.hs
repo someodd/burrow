@@ -21,7 +21,7 @@ import Data.Maybe (fromMaybe)
 import System.Directory (copyFile)
 import qualified Data.HashMap.Strict as H
 import Data.List (isSuffixOf)
-import System.FilePath (takeDirectory, (</>), (<.>), isExtensionOf)
+import System.FilePath (takeFileName, takeDirectory, (</>), (<.>), isExtensionOf)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -92,6 +92,7 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie filePath con
         , frrTemplateToRender = sourcePath
         , frrContentType = contentType
         , frrOutPath = outPath
+        , frrBucktooth = takeFileName outPath == ".gophermap"
         , frrIncludePartial = Nothing
         , frrSubstitutions = dataForMustache
         , frrSkipMustache = False
@@ -170,7 +171,7 @@ buildFile sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath,
   finalContents <- if frrSkipMarkdown recipe
     then pure testContents
     -- We're using the `ContentType` from the recipe in case it was overridden.
-    else parseMarkdown (frrContentType recipe) testContents :: IO T.Text
+    else parseMarkdown (frrBucktooth recipe) (frrContentType recipe) testContents :: IO T.Text
 
   let filePathToWriteTo = frrOutPath recipe
   createDirectoryIfMissing True (takeDirectory filePathToWriteTo)
@@ -194,6 +195,8 @@ data FileRenderRecipe = FileRenderRecipe
   -- ^ What kind of file in gopherspace are we building for?
   , frrOutPath :: FilePath
   -- ^ Where the parsed file shall be written out to.
+  , frrBucktooth :: Bool
+  -- ^ Is the file a .gophermap which needs to be in the Bucktooth/spacecookie format?
   , frrIncludePartial :: Maybe FilePath
   -- ^ If a partial is being used, the main file to be parsed is instead specified here,
   -- so it may be loaded as a partial named "partial" in the template/.
@@ -250,16 +253,16 @@ parseMustache mainText recipe = do
 
 
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
-parseMarkdown :: ContentType -> T.Text -> IO T.Text
-parseMarkdown GopherFileType contents = do
+parseMarkdown :: Bool -> ContentType -> T.Text -> IO T.Text
+parseMarkdown _ GopherFileType contents = do
   out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherPage))
   case out of
     Left parseError -> error $ show parseError
     Right penv -> do
       allTheAsciiFonts <- getAsciiFonts
-      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = Nothing, envPreserveLineBreaks = True }
+      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = Nothing, envPreserveLineBreaks = True, envBucktooth = False }
       pure . gopherMenuToText env $ (runReader penv env :: GopherPage)
-parseMarkdown GopherMenuType contents = do
+parseMarkdown bucktooth GopherMenuType contents = do
   out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherPage))
   config <- getConfig
   host <- T.pack <$> getConfigValue config "general" "host"
@@ -269,7 +272,7 @@ parseMarkdown GopherMenuType contents = do
     Right penv -> do
       allTheAsciiFonts <- getAsciiFonts
       -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
-      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = Just (host, port), envPreserveLineBreaks = True }
+      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = Just (host, port), envPreserveLineBreaks = True, envBucktooth = bucktooth }
       pure . gopherMenuToText env $ (runReader penv env :: GopherPage)
 
 
