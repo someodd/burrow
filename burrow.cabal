@@ -9,7 +9,7 @@ name:                burrow
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.1.13.0
+version:             0.1.14.0
 
 -- A short (one-line) description of the package.
 synopsis:            Build gopherholes.
@@ -85,6 +85,7 @@ common shared-properties
     hourglass,
     raw-strings-qq,
     aeson,
+    network-uri,
     neat-interpolation,
     yaml
 
