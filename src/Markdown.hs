@@ -15,16 +15,26 @@ module Markdown
   , GopherPage(..)
   ) where
 
+import Network.URI
+  (URI
+  , uriScheme
+  , parseURI
+  , uriAuthority
+  , uriPath
+  , uriRegName
+  , uriPort
+  )
 import Data.Maybe (isJust)
 import Data.Foldable (fold)
 import Data.Char (toLower)
-import Data.List (groupBy, intercalate, intersperse)
+import Data.List (groupBy, intercalate, intersperse, isPrefixOf, isSuffixOf)
 import Text.Numeral.Roman (toRoman)
 import Commonmark hiding (addAttribute, escapeURI)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import Control.Monad.Reader
 import qualified Data.Map as Map
+import System.FilePath (takeExtension)
 
 import TextUtils.Headings
 import TextUtils (italicize, embolden)
@@ -58,32 +68,130 @@ parseHeading' level fonts ils = T.pack $ headingCompose font $ show ils
       Nothing -> error $ "No font for level: " ++ show level
 
 
+-- FIXME: this belongs in a general type somewhere?
+-- | Represents a gpohermap/menu link of (item type, label, resource/magic
+-- string/path, host, port).
+type GopherLink = (Char, String, String, String, Int)
+
+
+-- WILL WORK FOR HTTP AND GOPHER LINKS!
+-- NEEDS TO DO SOMETHING DIFFERENT IF HTTP LINK
+-- FIXME: does this actually work for not just gopher links?
+-- FIXME: if cannot parse URI assume local gopher link and use host/port from creategopherpagelink
+-- FIXME: this belongs in a general gopher library
+-- |
+--
+-- Does not parse relative paths?
+linkFromURI :: (Text, Text) -> Text -> Text -> GopherLink
+linkFromURI (hostDefault, portDefault) uriText displayString =
+  case fromURI <$> uri of
+    Just fromAbsoluteURI -> fromAbsoluteURI
+    -- probably a relative URI
+    Nothing ->
+      ( determineItemType . T.unpack $ uriText
+      , T.unpack displayString
+      , T.unpack uriText
+      , hostDefaultString
+      , portDefaultInt
+      )
+ where
+  uri :: Maybe URI
+  uri = parseURI . T.unpack $ uriText
+
+  hostDefaultString :: String
+  hostDefaultString = T.unpack hostDefault
+
+  portDefaultInt :: Int
+  portDefaultInt = read . T.unpack $ portDefault
+
+  isHTTP :: Bool
+  isHTTP =
+    case ("http" `isPrefixOf`) <$> (uriScheme <$> uri) of
+      Just True -> True
+      _ -> False
+
+  fromURI :: URI -> GopherLink
+  fromURI uri' =
+    let path = uriPath uri'
+        charType = if isHTTP then 'h' else determineItemType $ uriPath uri'
+        (hostOverride, portOverride) = hostPort uri'
+    in (charType, T.unpack displayString, path, hostOverride, portOverride)
+
+  hostPort :: URI -> (String, Int)
+  hostPort uri' =
+    case uriAuthority uri' of
+      Just uriAuth ->
+        -- could be an HTTP link here... FIXME logic isn't done...
+        let
+          host' = (if isHTTP then "URL:" else "") ++ (uriRegName uriAuth)
+          port' =
+            case uriPort uriAuth of -- will be something like ":42" or ""
+              "" -> portDefaultInt
+              x -> let withoutColon = tail x in read withoutColon :: Int
+        in (host', port')
+      -- FIXME: figure out why this might happen. passing the default host and
+      -- port might not be wise here.
+      Nothing ->
+        -- the uriauthority can fail because the uris can be relative?
+        -- FIXME: this is wrong if http? but then again, it can't have http
+        -- links without authority specified...
+        (hostDefaultString, portDefaultInt)
+
+
+-- FIXME: rename to itmeTypeChar
+determineItemType :: String -> Char
+determineItemType path
+  -- canonical types
+  | "/0/" `isPrefixOf` path = '0'
+  | "/1/" `isPrefixOf` path = '1'
+  | "/2/" `isPrefixOf` path = '2'
+  | "/3/" `isPrefixOf` path = '3'
+  | "/4/" `isPrefixOf` path = '4'
+  | "/5/" `isPrefixOf` path = '5'
+  | "/6/" `isPrefixOf` path = '6'
+  | "/7/" `isPrefixOf` path = '7'
+  | "/8/" `isPrefixOf` path = '8'
+  | "/9/" `isPrefixOf` path = '9'
+  | "/+/" `isPrefixOf` path = '+'
+  | "/g/" `isPrefixOf` path = 'g'
+  | "/I/" `isPrefixOf` path = 'I'
+  | "/T/" `isPrefixOf` path = 'T'
+  -- gopher+ types
+  | "/:/" `isPrefixOf` path = ':'
+  | "/;/" `isPrefixOf` path = ';'
+  | "/</" `isPrefixOf` path = '<'
+  -- non-canonical types
+  | "/d/" `isPrefixOf` path = 'd'
+  | "/s/" `isPrefixOf` path = 's'
+  -- determine by suffix instead
+  | ".txt" `isSuffixOf` path = '0'
+  | ".jpg" `isSuffixOf` path = 'I'
+  | ".jpeg" `isSuffixOf` path = 'I'
+  | ".png" `isSuffixOf` path = 'I'
+  | ".gif" `isSuffixOf` path = 'g'
+  -- If we couldn't match/figure it out, we'll assume it's a binary file if
+  -- there's an extension
+  | takeExtension path /= "" = '9'
+  -- otherwise we assume (if no dot) that it's a gopher directory
+  | otherwise = '1'
+
+
+-- FIXME: using a hole for title. Should use title.
 -- | Make a Gopher link according to the Gopher spec (RFC 1496 I think) for a
 -- gophermap.
 createGopherPageLink :: (Text, Text) -> Text -> Text -> Text -> Text
-createGopherPageLink (host, port) target title label =
-  determineLinkType
- where
-  intercalateLink :: Text -> Text -> Maybe (Text, Text) -> Text
-  intercalateLink itemType newTarget maybeHostAndPort =
-    let title' = if T.null title then "" else " (" <> title <> ")"
-        addHostPort = if isJust maybeHostAndPort then (++ ["\t", host, "\t", port]) else id
-    in T.intercalate "" $ addHostPort [itemType, label <> title' :: Text, "\t", newTarget]
-
-  -- FIXME: rename or refactor!
-  -- FIXME: should use leading indicators too like /0/ or /1/
-  determineLinkType :: Text
-  determineLinkType
-    -- Link to an external gopher resource
-    | "gopher" `T.isPrefixOf` target = do
-      -- FIXME: parse gopher link into its parts host, port, resource
-      error "IMPLEMENT ME SOON!"
-    -- Link to an HTTP web page.
-    | "http" `T.isPrefixOf` target = intercalateLink "h" ("URL:" <> target) Nothing
-    -- Link to a plaintext file in gopherspace.
-    | ".txt" `T.isSuffixOf` target = intercalateLink "1" target (Just (host, port))
-    -- Anything else is assumed to be a link to another gophermap/menu.
-    | otherwise = intercalateLink "0" target (Just (host, port))
+createGopherPageLink (host, port) target _ label =
+  let
+    ((itemTypeChar, displayString, magicString, host', port') :: GopherLink) =
+      linkFromURI (host, port) target label
+    lineParts =
+      [ itemTypeChar : displayString
+      , magicString
+      , host'
+      , show port'
+      ]
+  in
+    T.intercalate "\t" $ map T.pack lineParts
 
 
 -- | DO NOT USE

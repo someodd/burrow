@@ -147,7 +147,6 @@ createRenderRecipe sourceDirectory destinationDirectory spaceCookie filePath con
 
 
 -- FIXME: note that "Skip" means to skip the render process and just copy the file.
--- FIXME: rename, buildFile?
 buildFile :: FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
 buildFile sourceDirectory destinationDirectory _ sourceFile@(filePath, SimplyCopy) = do
   -- Don't parse; just copy the file to the target directory.
