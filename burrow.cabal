@@ -139,17 +139,3 @@ library
 
   -- Directories containing source files.
   hs-source-dirs:      src
-
-test-suite waffle-test
-  import: shared-properties
-
-  -- The interface type and version of the test suite.
-  type:                exitcode-stdio-1.0
-
-  -- The directory where the test specifications are found.
-  hs-source-dirs:      test
-
-  -- The entrypoint to the test suite.
-  main-is:             DocTests.hs
-
-  build-depends:       doctest >= 0.16.3 && < 0.17,

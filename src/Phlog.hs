@@ -421,6 +421,7 @@ getPostMetasGroupPair (PostMetasGroup (label, hashMap)) key =
   -- FIXME: fromjust
   PostMetasGroupPair (label, key, fromJust $ HashMap.lookup key hashMap)
 
+
 -- | Group posts together by some property of the FrontMatter. Weeds out posts
 -- without FrontMatter.
 --
@@ -428,8 +429,12 @@ getPostMetasGroupPair (PostMetasGroup (label, hashMap)) key =
 -- value. 
 --
 -- >>> import Data.Functor.Identity (Identity(..))
--- >>> (frontMatterHashMapGroup somePostMetas ("title", Identity . title) :: (String, HashMap.HashMap (Maybe T.Text) [PostMeta))
--- >>> (frontMatterHashMapGroup somePostMetas ("tag", tags) :: (String, HashMap.HashMap Tag [PostMeta]))
+-- >>> import Data.HashMap.Strict
+-- >>> import Data.Text
+-- >>> frontMatterHashMapGroup somePostMetas ("title", Identity . title) :: (String, HashMap (Maybe Text) [PostMeta])
+-- ...
+-- >>> frontMatterHashMapGroup somePostMetas ("tag", tags) :: (String, HashMap.HashMap Tag [PostMeta])
+-- ...
 frontMatterHashMapGroup
   :: (Eq a, Hashable a, Foldable f)
   => [PostMeta]

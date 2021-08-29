@@ -68,32 +68,31 @@ parseHeading' level fonts ils = T.pack $ headingCompose font $ show ils
       Nothing -> error $ "No font for level: " ++ show level
 
 
--- FIXME: this belongs in a general type somewhere?
 -- | Represents a gpohermap/menu link of (item type, label, resource/magic
 -- string/path, host, port).
 type GopherLink = (Char, String, String, String, Int)
 
 
--- WILL WORK FOR HTTP AND GOPHER LINKS!
--- NEEDS TO DO SOMETHING DIFFERENT IF HTTP LINK
--- FIXME: does this actually work for not just gopher links?
--- FIXME: if cannot parse URI assume local gopher link and use host/port from creategopherpagelink
--- FIXME: this belongs in a general gopher library
--- |
+-- | Create a `GopherLink` using a relative or absolute URI.
+--
+-- If the scheme is `http://` or `https://` then create an 'h' type URL link for
+-- clients to open in a web browser.
+--
+-- If the URI is relative assume the host and port provided by default.
+--
+-- If the scheme is `gopher://` link to a (probably) remote gopher server,
+-- using the host and port (or default port 70) defined in the URI.
+--
+-- >>> linkFromURI ("example.org", "7070") "/foo/bar/file.txt" "Some File"
+-- ('0', "Some File", "/foo/bar/file.txt", "example.org", 7070)
 --
 -- Does not parse relative paths?
 linkFromURI :: (Text, Text) -> Text -> Text -> GopherLink
 linkFromURI (hostDefault, portDefault) uriText displayString =
-  case fromURI <$> uri of
-    Just fromAbsoluteURI -> fromAbsoluteURI
-    -- probably a relative URI
-    Nothing ->
-      ( determineItemType . T.unpack $ uriText
-      , T.unpack displayString
-      , T.unpack uriText
-      , hostDefaultString
-      , portDefaultInt
-      )
+  maybe
+    (itemTypeChar . T.unpack $ uriText, T.unpack displayString, T.unpack uriText, hostDefaultString, portDefaultInt)
+    fromURI
+    uri
  where
   uri :: Maybe URI
   uri = parseURI . T.unpack $ uriText
@@ -104,16 +103,19 @@ linkFromURI (hostDefault, portDefault) uriText displayString =
   portDefaultInt :: Int
   portDefaultInt = read . T.unpack $ portDefault
 
-  isHTTP :: Bool
-  isHTTP =
-    case ("http" `isPrefixOf`) <$> (uriScheme <$> uri) of
+  isScheme :: [String] -> Bool
+  isScheme schemes = 
+    case (\validScheme -> any (\x -> x ++ ":" == validScheme) schemes) . uriScheme <$> uri of
       Just True -> True
       _ -> False
+
+  isHTTP :: Bool
+  isHTTP = isScheme ["http", "https"]
 
   fromURI :: URI -> GopherLink
   fromURI uri' =
     let path = uriPath uri'
-        charType = if isHTTP then 'h' else determineItemType $ uriPath uri'
+        charType = if isHTTP then 'h' else itemTypeChar $ uriPath uri'
         (hostOverride, portOverride) = hostPort uri'
     in (charType, T.unpack displayString, path, hostOverride, portOverride)
 
@@ -123,10 +125,11 @@ linkFromURI (hostDefault, portDefault) uriText displayString =
       Just uriAuth ->
         -- could be an HTTP link here... FIXME logic isn't done...
         let
-          host' = (if isHTTP then "URL:" else "") ++ (uriRegName uriAuth)
+          host' = (if isHTTP then "URL:" else "") ++ uriRegName uriAuth
           port' =
             case uriPort uriAuth of -- will be something like ":42" or ""
-              "" -> portDefaultInt
+              -- if gopher then default port is 70 if not a relative URI!
+              "" -> 70
               x -> let withoutColon = tail x in read withoutColon :: Int
         in (host', port')
       -- FIXME: figure out why this might happen. passing the default host and
@@ -138,9 +141,11 @@ linkFromURI (hostDefault, portDefault) uriText displayString =
         (hostDefaultString, portDefaultInt)
 
 
--- FIXME: rename to itmeTypeChar
-determineItemType :: String -> Char
-determineItemType path
+-- FIXME: could use a map, do a look up, use that item type char, if Nothing
+-- then test if it has an extension (it'll be a binary file) otherwise it's a
+-- directory!
+itemTypeChar :: String -> Char
+itemTypeChar path
   -- canonical types
   | "/0/" `isPrefixOf` path = '0'
   | "/1/" `isPrefixOf` path = '1'
@@ -182,10 +187,10 @@ determineItemType path
 createGopherPageLink :: (Text, Text) -> Text -> Text -> Text -> Text
 createGopherPageLink (host, port) target _ label =
   let
-    ((itemTypeChar, displayString, magicString, host', port') :: GopherLink) =
+    ((itemTypeChar', displayString, magicString, host', port') :: GopherLink) =
       linkFromURI (host, port) target label
     lineParts =
-      [ itemTypeChar : displayString
+      [ itemTypeChar' : displayString
       , magicString
       , host'
       , show port'
@@ -199,7 +204,7 @@ instance Show (ParseEnv GopherLine) where
   show _ = "I *said*: DO NOT USE!"
 
 
-instance Semigroup (GopherLine) where
+instance Semigroup GopherLine where
   x <> NullLine = x
   NullLine <> x = x
   InfoLineToken x <> InfoLineToken y = InfoLineToken $ x <> y
@@ -227,6 +232,8 @@ instance HasAttributes (ParseEnv GopherPage) where
   addAttributes _ x = x
 
 
+-- | Turn the representation made from parsing the commonmark/markdown into
+-- `Text` which can be written out to a file, the final product.
 gopherMenuToText :: Environment -> GopherPage -> Text
 gopherMenuToText _ NullBlock = ""
 gopherMenuToText environment (Block t) =
@@ -248,7 +255,8 @@ gopherMenuToText environment (Block t) =
   joinTokens :: [GopherLine] -> GopherLine
   joinTokens [InfoLineToken l] = CompleteInfoLine $ l <> infoSuffixConditional
   joinTokens incompleteLines@(InfoLineToken _:_) =
-    let (InfoLineToken token) = (fold incompleteLines :: GopherLine) in CompleteInfoLine $ token <> infoSuffixConditional
+    let (InfoLineToken token) = (fold incompleteLines :: GopherLine)
+    in CompleteInfoLine $ token <> infoSuffixConditional
   joinTokens [x] = x
   joinTokens _ = error "should be impossible! FIXME!" -- FIXME
 
@@ -257,11 +265,14 @@ gopherMenuToText environment (Block t) =
   reduceNewLines gopherLines =
     foldl foo [] gopherLines
    where
+    -- This match describes encountering a GopherNewLine and we then need to determine what came before it?
     foo acc@(_:_) GopherNewLine =
       case last acc of
+        -- The line which preceeded the current GopherNewLine was another GopherNewLine! Remove the last GopherNewLine and replace it with...
         GopherNewLine -> init acc ++ [CompleteInfoLine $ if menuMagic then "\ni " <> infoLineSuffixMenuMagic <> "\n" else "\n\n"]
         (CompleteInfoLine i) -> init acc ++ [CompleteInfoLine $ i <> "\n"]
         (LinkLine link') -> init acc ++ [LinkLine $ link' <> "\n"]
+        -- why this? doesn't this disappear the GopherNewLine we encountered?
         a -> acc ++ [a]
     foo acc n = acc ++ [n]
 
@@ -284,7 +295,7 @@ gopherMenuToText environment (Block t) =
     case gopherLine of
       NullLine -> ""
       GopherNewLine -> ""
-      -- NOTE: there's a tab filter here because tabs will break info lines in the future spacecookie
+      -- NOTE: maybe there should be a tab filter here because tabs will break info lines in the future spacecookie
       (CompleteInfoLine l) -> ((if menuMagic && not bucktooth then "i" else "") <>) $ l
       (InfoLineToken l) -> l
       (LinkLine l) -> l
@@ -322,18 +333,22 @@ instance Rangeable (ParseEnv GopherPage) where
   ranged _ x = x
 
 
--- TODO/FIXME: the entire token/complete scheme is counter-intuitive and should
--- at least be explained, if not replaced.
 data GopherLine
   = CompleteInfoLine Text
+  -- ^ An info line which was completed as a whole line by joining a bunch of
+  -- `InfoLineToken`s together.
   | InfoLineToken Text
   -- ^ An InfoLineToken is a part of an info line, which must be combined with
-  -- other tokens to create a CompleteInfoLine.
+  -- other tokens to create a CompleteInfoLine. This is simply due to the way
+  -- our parsing code interacts with `Commonmark` library, creating
+  -- `InfoLineTokens` and `Block`s for everything that isn't a link.
   | LinkLine Text
+  -- ^ A markdown link parsed into a gopher link according to the gopher
+  -- protocol RFC, as well as the extended and noncanonical link types (like
+  -- HTML URLs).
   | GopherNewLine
   | NullLine
   deriving (Show, Eq)
--- FIXME: better name!
 data GopherPage = Block [GopherLine] | NullBlock
 
 
@@ -342,16 +357,18 @@ lineToText (InfoLineToken t) = t
 lineToText _ = error "this should be impossible!"  -- FIXME
 
 
--- intersperse GopherNewLine $ map InfoLineToken
+-- | Use a function to change the text belonging to the lines making up a
+-- `Block`.
 transformLines :: (Text -> Text) -> GopherPage -> GopherPage
 transformLines someFunc (Block gopherLines) =
-  -- first change it to a bunch of text lines
   let textLines = map lineToText (gopherLines :: [GopherLine])
       transformedText = map someFunc textLines
   in Block $ map InfoLineToken transformedText
 transformLines _ NullBlock = NullBlock
 
 
+-- | Turn a bunch of `GopherLine`s into a single `Text`. This is especially
+-- handy for merging `InfoLineToken`s.
 combineLines :: [GopherLine] -> Text
 combineLines gopherLines =
   T.intercalate "" $ map lineToText gopherLines
@@ -456,3 +473,7 @@ instance IsInline (ParseEnv GopherPage) => IsBlock (ParseEnv GopherPage) (ParseE
             OneParen -> map (<> ") ") enumerator
             TwoParens -> map (\x -> "(" <> x <> ") ") enumerator
     listMagic listItems prefixEnumerator
+
+
+-- $setup
+-- >>> :set -XOverloadedStrings
