@@ -1,5 +1,7 @@
 cabal-version:       3.0
 
+tested-with: GHC==8.10.7
+
 -- The name of the package.
 name:                burrow
 
@@ -53,15 +55,15 @@ common shared-properties
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror
 
   build-depends:
-    base                 >=4.7 && <5,
+    base                 >=4.12 && <4.15,
     text,
-    errata,
+    errata == 0.3.0.0,
     xml-conduit-writer,
     parsec,
     data-default,
     xml-conduit,
-    word-wrap,
-    table-layout         ^>=0.9,
+    word-wrap == 0.4.1,
+    table-layout         ==0.9.1.0,
     split,
     bytestring,
     containers,
@@ -75,7 +77,6 @@ common shared-properties
     mtl,
     ConfigFile,
     commonmark,
-    roman-numerals,
     frontmatter,
     attoparsec,
     vector,

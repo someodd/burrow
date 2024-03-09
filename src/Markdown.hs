@@ -28,7 +28,6 @@ import Data.Maybe (isJust)
 import Data.Foldable (fold)
 import Data.Char (toLower)
 import Data.List (groupBy, intercalate, intersperse, isPrefixOf, isSuffixOf)
-import Text.Numeral.Roman (toRoman)
 import Commonmark hiding (addAttribute, escapeURI)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -53,6 +52,15 @@ data Environment =
     -- ^ use the bucktooth/spacecookie format of .gophermap menus.
     }
 
+
+toRoman :: Int -> String
+toRoman num = 
+  let values = [(1000,"M"), (900,"CM"), (500,"D"), (400,"CD"), (100,"C"), (90,"XC"), (50,"L"), (40,"XL"), (10,"X"), (9,"IX"), (5,"V"), (4,"IV"), (1,"I")]
+      convert _ [] = ""
+      convert n ((value, symbol):rest)
+        | n >= value = symbol ++ convert (n - value) ((value, symbol):rest)
+        | otherwise = convert n rest
+  in convert num values
   
 -- | Make the ascii art font files available to a commonmark parser.
 type ParseEnv a = Reader Environment a
