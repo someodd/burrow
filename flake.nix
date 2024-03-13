@@ -28,8 +28,6 @@
             errata.source = "0.3.0.0"; # Hackage version override
             hspec-golden.source = "0.1.0.3";
             word-wrap.source = "0.4.1";
-            zlib.source = "0.7.0.0"
-
           };
           settings = {
             #  aeson = {
