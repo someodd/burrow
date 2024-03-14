@@ -2,6 +2,8 @@
 
 Burrow is a *static site generator,* but for gopherholes. A *gopherhole* is a place in *gopherspace* accessed through the [Gopher protocol](https://en.wikipedia.org/wiki/Gopher_%28protocol%29)).
 
+I made my gopherhole with burrow, so it's an example: gopher://someodd.duckdns.org:7071/
+
 There's an example gopherhole (in `burrowsrc/`, with a default config in
 `data/gopherhole.ini`) you can build with these command and then visit `localhost:7070` in
 `gopher`:
