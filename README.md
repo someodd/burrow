@@ -2,19 +2,25 @@
 
 Burrow is a *static site generator,* but for gopherholes. A *gopherhole* is a place in *gopherspace* accessed through the [Gopher protocol](https://en.wikipedia.org/wiki/Gopher_%28protocol%29)).
 
-I made my gopherhole with burrow, so it's an example: gopher://someodd.duckdns.org:7071/
+I made my gopherhole with burrow, so it's an example: gopher://gopher.someodd.zip:7071/
+
+There's a `.deb` (Ubuntu, Debian) available in the releases.
+
+Written in Haskell. If you're looking for very similar software, with coincidentally the exact same name, please check out [James Tomasino's Burrow](https://github.com/jamestomasino/burrow).
+
+## Quick Start
 
 There's an example gopherhole (in `burrowsrc/`, with a default config in
 `data/gopherhole.ini`) you can build with these command and then visit `localhost:7070` in
 `gopher`:
 
 ```
-cabal run burrow -- build --spacecookie
+burrow build --spacecookie
 cd built
 spacecookie ../data/spacecookie.json
 ```
 
-Written in Haskell. If you're looking for very similar software, with coincidentally the exact same name, please check out [James Tomasino's Burrow](https://github.com/jamestomasino/burrow).
+The `--spacecookie` flag parses `index.menu.md` files to `.gophermap` files, I think?
 
 ## Features
 
@@ -62,14 +68,14 @@ tag summaries).
 
 ### Change a lot of the behavior through an INI
 
-Be sure to look at `gopherhole.ini` in order to control and customize the builder!
+Be sure to look at `data/gopherhole.ini` in order to control and customize the builder!
 
 ## Other notes
 
 This software has primarily been tested with
 [spacecookie](https://github.com/sternenseemann/spacecookie) (Gopher server).
 You may want to look at [my spacecookie Docker
-repo](https://github.com/hyperrealgopher/docker-spacecookie). Currently, Burrow relies heavily on the `.gophermap` behavior outlined in these documents:
+repo](https://github.com/someodd/docker-spacecookie). Currently, Burrow relies heavily on the `.gophermap` behavior outlined in these documents:
 
 * [spacecookie.gophermap(5)](https://sternenseemann.github.io/spacecookie/spacecookie.json.5.html)
 * [Bucktooth's gophermap tutorial](http://gopher.floodgap.com/gopher/gw.lite?=gopher.floodgap.com+70+302f6275636b2f6462726f7773653f666171757365203161)
@@ -103,7 +109,7 @@ Turn this:
 title: Example phlog post
 published: 2021-06-12
 updated: June 13th, 2021 at 10pm
-author: Hyperreal Gopher
+author: someodd
 type: post
 tags: foo bar
 variables: {"someVariable": "Some text to replace someVariable.", "foo": "bar"}
@@ -141,7 +147,7 @@ Into this:
 
 Posted: 2021-06-12
 Updated: 2021-06-13
-Author: Hyperreal Gopher
+Author: someodd
 Tags: foo, bar
 
 This is an example phlog post.

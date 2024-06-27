@@ -362,7 +362,10 @@ data GopherPage = Block [GopherLine] | NullBlock
 
 lineToText :: GopherLine -> Text
 lineToText (InfoLineToken t) = t
-lineToText _ = error "this should be impossible!"  -- FIXME
+lineToText (CompleteInfoLine t) = t
+lineToText (LinkLine t) = t
+lineToText GopherNewLine = "\n"
+lineToText NullLine = ""
 
 
 -- | Use a function to change the text belonging to the lines making up a

@@ -42,7 +42,7 @@ Other common commands:
 Copied verbatim I think:
 
   1. Press "Ctrl-A" on the keyboard and press "Esc."
-  1. Press the "Up" and "Down" arrow keys or the "PgUp" and "PgDn" keys to scroll through previous output.
+  1. Press the "Up" and "Down" arrow keys or the "PgUp" and "PgDn" keys to scroll through previous utput.
   1. Press "Esc" to exit scrollback mode.
 
 ## Sources

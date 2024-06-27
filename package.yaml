@@ -1,0 +1,87 @@
+name: burrow
+version: 0.1.15.0
+synopsis: Build gopherholes.
+description: |
+  Static site builder, but for gopherholes. Manage phlogs with tags, use the Markdown renderer and Mustache templating system.
+homepage: https://github.com/hyperrealgopher/burrow
+bug-reports: https://github.com/hyperrealgopher/burrow/issues
+license: GPL-3.0-only
+license-file: LICENSE
+author: someodd
+maintainer: someodd@pm.pm
+category: Network
+extra-source-files:
+  - README.md
+  - CHANGELOG.md
+tested-with: GHC==8.10.7
+
+ghc-options:
+  - -threaded
+  - -rtsopts
+  - -with-rtsopts=-N
+  - -Wall
+  - -Werror
+
+dependencies:
+  - base >= 4.12 && < 4.15
+  - text
+  - errata == 0.3.0.0
+  - xml-conduit-writer
+  - parsec
+  - data-default
+  - xml-conduit
+  - word-wrap == 0.4.1
+  - table-layout == 0.9.1.0
+  - split
+  - bytestring
+  - containers
+  - mustache
+  - filepattern
+  - hashmap
+  - directory
+  - unordered-containers
+  - filepath
+  - optparse-applicative
+  - mtl
+  - ConfigFile
+  - commonmark
+  - frontmatter
+  - attoparsec
+  - vector
+  - time
+  - hashable
+  - fuzzy-dates
+  - hourglass
+  - raw-strings-qq
+  - aeson
+  - network-uri
+  - neat-interpolation
+  - yaml
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - TextUtils
+    - TextUtils.Headings
+    - Markdown
+    - Mustache
+    - Build
+    - Config
+    - FrontMatter
+    - Phlog
+    - Types
+  default-extensions: OverloadedStrings
+  default-language: Haskell2010
+
+executables:
+  burrow:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+      - burrow
+    autogen-modules:
+      - Paths_burrow
+    other-modules:
+      - Paths_burrow
+    default-extensions: OverloadedStrings
+    default-language: Haskell2010

@@ -4,3 +4,6 @@ dist-newstyle/
 cabal-docspec
 built/
 result
+.direnv/
+bin/
+*.deb

@@ -1,25 +1,25 @@
 
 ┌─────────────────────────────────────────────┐
-│           __   ___  __   __   ___           │▒
-│ |__| \ / |__) |__  |__) |__) |__   /\  |    │▒
-│ |  |  |  |    |___ |  \ |  \ |___ /~~\ |___ │▒
-│        __   __   __        ___  __          │▒ 
-│       / _` /  \ |__) |__| |__  |__)         │▒
-│       \__> \__/ |    |  | |___ |  \         │▒
-│                                             │▒ 
+│      __   __         ___  __   __   __      │▒
+│     /__` /  \  |\/| |__  /  \ |  \ |  \     │▒
+│     .__/ \__/  |  | |___ \__/ |__/ |__/     │▒
+│                                             │▒
 ├─────────────────────────────────────────────┤▒ 
 │                                             │▒ 
 │ Welcome to my hidden gopherhole! My name is │▒
-│ Hyperreal Gopher.                           │▒
+│ someodd.                                    │▒
 │                                             │▒ 
 └─────────────────────────────────────────────┘▒
  ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
 
-Matrix: hyperrealgopher:privacytools.io
-Email: hyperrealgopher@protonmail.ch.
-hGithub: @hyperrealgopher	URL:https://github.com/hyperrealgopher
-hMastodon: @hyperrealgopher@fosstodon.org	URL:https://fosstodon.org/@hyperrealgopher
+Email: someodd@pm.me
+hGithub: @someodd	URL:https://github.com/someodd
+hMastodon: @someodd@fosstodon.org	URL:https://fosstodon.org/@someodd
+hWebsite (www)	URL:https://www.someodd.zip/
+hWhisper Radio 	URL:https://radio.someodd.zip/stream
+1gopherden BBS	/	gopher.someodd.zip	7070
 1Phlog	/phlog
+1JGS ASCII Art Archive	/jgs-archive
 
 
 ┌─────────────────────────────────────────────┐
@@ -38,7 +38,7 @@ Tor and an account I create for you (ZNC).
 
 Feel free to contact me to get an account.
 
-hSpeakeasy Docker setup on GitHub	URL:https://github.com/hyperrealgopher/speakeasy
+hSpeakeasy Docker setup on GitHub	URL:https://github.com/someodd/speakeasy
 0Connection info	/irc-connection-info.txt
 
 
@@ -57,14 +57,23 @@ even feature some in my phlog:
 
 1My favorite gopherholes	/favorite-gopherholes.menu.md
 
+My software for serving a forum via Gopher:
+
+hgopherden on GitHub	URL:https://github.com/someodd/gopherden
+
 I made a Gopher client called "Waffle:"
 
-hWaffle on Github	URL:https://github.com/hyperrealgopher/waffle
-hWaffle room on Matrix	URL:https://matrix.to/#/!ErxkIgxbsTfPysApWD:privacytools.io?via=privacytools.io
+hWaffle on Github	URL:https://github.com/someodd/waffle
 
 I also made a gopherhole builder named "Burrow:"
 
-hBurrow on GitHub	URL:https://github.com/hyperrealgopher/burrow
+hBurrow on GitHub	URL:https://github.com/someodd/burrow
+
+I made software which can serve a system
+dashboard through Gopher:
+
+hdopherdashboard on GitHub	URL:https://github.com/someodd/gopherdashboard
+
 
 hThis gopherhole proudly served using spacecookie	URL:https://github.com/sternenseemann/spacecookie
-hMy spacecookie Docker configuration	URL:https://github.com/hyperrealgopher/docker-spacecookie
+hMy spacecookie Docker configuration	URL:https://github.com/someodd/docker-spacecookie
