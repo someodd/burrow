@@ -18,26 +18,23 @@ fi
 # Remove 'v' prefix if present
 NEW_VERSION=${NEW_VERSION#v}
 
+# Get the current version
+CURRENT_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --max-count=1))
+CURRENT_VERSION=${CURRENT_TAG#v}
+
 # Get the date in YYYY-MM-DD format
 RELEASE_DATE=$(date +%Y-%m-%d)
 
-# Update the Changelog
-sed -i '/## \[Unreleased\]/a\
-\
-## ['$NEW_VERSION'] - '$RELEASE_DATE'' CHANGELOG.md
+###################
 
-sed -i 's/\[Unreleased\]: /['$NEW_VERSION']: /' CHANGELOG.md
+# Update the Unreleased section to new version
+sed -i "s/^## \[Unreleased\]/## [$NEW_VERSION] - $(date +%Y-%m-%d)/" CHANGELOG.md
 
-sed -i '1i## [Unreleased]\
-\
-' CHANGELOG.md
+# Add new Unreleased section
+sed -i "/^## \[$NEW_VERSION\]/i## [Unreleased]\n" CHANGELOG.md
 
-# Get the previous tag
-PREVIOUS_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --skip=1 --max-count=1))
+# Update the unreleased comparison link
+sed -i "s|\[unreleased\]: .*|[unreleased]: https://github.com/someodd/burrow/compare/v$NEW_VERSION...HEAD|" CHANGELOG.md
 
-# Update the links at the bottom of the file
-sed -i '6i\
-[Unreleased]: https://github.com/username/repo/compare/v'$NEW_VERSION'...HEAD\
-['$NEW_VERSION']: https://github.com/username/repo/compare/'$PREVIOUS_TAG'...v'$NEW_VERSION'' CHANGELOG.md
-
-echo "Changelog updated for version $NEW_VERSION"
+# Add new version comparison link
+sed -i "/\[unreleased\]: /a[$NEW_VERSION]: https://github.com/someodd/burrow/compare/v$CURRENT_VERSION...v$NEW_VERSION" CHANGELOG.md

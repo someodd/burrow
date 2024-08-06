@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0.0] - 2024-08-05
+
 Lots of stuff related to the project but not necessarily a part of the version software
 update, like release management, docker file.
 
@@ -38,5 +40,6 @@ Nix is no longer used.
 
 I didn't account for many of the previous versions up to (inclusive) v0.1.14.0.
 
-[unreleased]: https://github.com/someodd/burrow/compare/v0.1.15.0...HEAD
+[unreleased]: https://github.com/someodd/burrow/compare/v0.2.0.0...HEAD
+[0.2.0.0]: https://github.com/someodd/burrow/compare/v0.1.15.0...v0.2.0.0
 [0.1.15.0]: https://github.com/someodd/burrow/release/v0.1.0.0
