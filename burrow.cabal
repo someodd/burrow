@@ -1,142 +1,145 @@
-cabal-version:       3.0
+cabal-version: 2.2
 
-tested-with: GHC==8.10.7
+-- This file has been generated from package.yaml by hpack version 0.36.0.
+--
+-- see: https://github.com/sol/hpack
 
--- The name of the package.
-name:                burrow
-
--- The package version.  See the Haskell package versioning policy (PVP)
--- for standards guiding when and how versions should be incremented.
--- https://pvp.haskell.org
--- PVP summary:      +-+------- breaking API changes
---                   | | +----- non-breaking API additions
---                   | | | +--- code changes with no API change
-version:             0.1.15.0
-
--- A short (one-line) description of the package.
-synopsis:            Build gopherholes.
-
--- A longer description of the package.
-description:
-  Static site builder, but for gopherholes.\n Manage phlogs with tags, use the Markdown renderer and Mustache templating system.
-
--- URL for the project homepage or repository.
-homepage:            https://github.com/hyperrealgopher/burrow
-
--- A URL where users can report bugs.
-bug-reports:         https://github.com/hyperrealgopher/burrow/issues
-
--- The license under which the package is released.
-license:             GPL-3.0-only
-
--- The file containing the license text.
-license-file:        LICENSE
-
--- The package author(s).
-author:              hyperrealgopher
-
--- An email address to which users can send suggestions, bug reports, and
--- patches.
-maintainer:          hyperrealgopher@protonmail.ch
-
--- A copyright notice.
--- copyright:
-
-category:            Network
-
--- Extra files to be distributed with the package, such as examples or a
--- README.
+name:           burrow
+version:        0.1.15.0
+synopsis:       Build gopherholes.
+description:    Static site builder, but for gopherholes. Manage phlogs with tags, use the Markdown renderer and Mustache templating system.
+category:       Network
+homepage:       https://github.com/hyperrealgopher/burrow
+bug-reports:    https://github.com/hyperrealgopher/burrow/issues
+author:         someodd
+maintainer:     someodd@pm.pm
+license:        GPL-3.0-only
+license-file:   LICENSE
+build-type:     Simple
+tested-with:
+    GHC==8.10.7
 extra-source-files:
-  README.md
-  CHANGELOG.md
-
--- FIXME: need to pin version
-common shared-properties
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror
-
-  build-depends:
-    base                 >=4.12 && <4.15,
-    text,
-    errata == 0.3.0.0,
-    xml-conduit-writer,
-    parsec,
-    data-default,
-    xml-conduit,
-    word-wrap == 0.4.1,
-    table-layout         ==0.9.1.0,
-    split,
-    bytestring,
-    containers,
-    mustache,
-    filepattern,
-    hashmap,
-    directory,
-    unordered-containers,
-    filepath,
-    optparse-applicative,
-    mtl,
-    ConfigFile,
-    commonmark,
-    frontmatter,
-    attoparsec,
-    vector,
-    time,
-    hashable,
-    fuzzy-dates,
-    hourglass,
-    raw-strings-qq,
-    aeson,
-    network-uri,
-    neat-interpolation,
-    yaml
-
-  -- LANGUAGE extensions used by modules in this package.
-  other-extensions:    OverloadedStrings
-
-  -- Base language which the package is written in.
-  default-language:    Haskell2010
-
-
-executable burrow
-  import: shared-properties
-
-  -- .hs or .lhs file containing the Main module.
-  main-is:             Main.hs
-
-  -- Modules included in this executable, other than Main.
-  other-modules:
-
-  -- Directories containing source files.
-  hs-source-dirs:      app
-
-  build-depends:
-    burrow,
-
-  other-modules:
-    Paths_burrow
-
-  autogen-modules:
-    Paths_burrow
-
+    README.md
+    CHANGELOG.md
 
 library
-  -- Modules exported by the library.
-  import: shared-properties
-
-  -- Other library packages from which modules are imported.
   exposed-modules:
-    TextUtils
-    TextUtils.Headings
-    Markdown
-    Mustache
-    Build
-    Config
-    FrontMatter
-    Phlog
-    Types
+      SpacecookieClone.Serve
+      SpacecookieClone.Config
+      SpacecookieClone.FileType
+      SpacecookieClone.Systemd
+      TextUtils
+      TextUtils.Headings
+      Markdown
+      Mustache
+      Build
+      Config
+      FrontMatter
+      Phlog
+      Types
+  other-modules:
+      Paths_burrow
+  autogen-modules:
+      Paths_burrow
+  hs-source-dirs:
+      src
+  default-extensions:
+      OverloadedStrings
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror
+  build-depends:
+      ConfigFile
+    , aeson
+    , attoparsec
+    , base >=4.12 && <4.15
+    , bytestring
+    , commonmark
+    , containers
+    , data-default
+    , directory
+    , errata ==0.3.0.0
+    , fast-logger
+    , filepath
+    , filepath-bytestring
+    , filepattern
+    , frontmatter
+    , fuzzy-dates
+    , hashable
+    , hashmap
+    , hourglass
+    , mtl
+    , mustache
+    , neat-interpolation
+    , network-uri
+    , optparse-applicative
+    , parsec
+    , raw-strings-qq
+    , socket
+    , spacecookie
+    , split
+    , systemd
+    , table-layout ==0.9.1.0
+    , text
+    , time
+    , unix
+    , unordered-containers
+    , vector
+    , word-wrap ==0.4.1
+    , xml-conduit
+    , xml-conduit-writer
+    , yaml
+  default-language: Haskell2010
 
-  -- Modules included in this library but not exported.
-  -- other-modules:
-
-  -- Directories containing source files.
-  hs-source-dirs:      src
+executable burrow
+  main-is: Main.hs
+  other-modules:
+      Paths_burrow
+  autogen-modules:
+      Paths_burrow
+  hs-source-dirs:
+      app
+  default-extensions:
+      OverloadedStrings
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror
+  build-depends:
+      ConfigFile
+    , aeson
+    , attoparsec
+    , base >=4.12 && <4.15
+    , burrow
+    , bytestring
+    , commonmark
+    , containers
+    , data-default
+    , directory
+    , errata ==0.3.0.0
+    , fast-logger
+    , filepath
+    , filepath-bytestring
+    , filepattern
+    , frontmatter
+    , fuzzy-dates
+    , hashable
+    , hashmap
+    , hourglass
+    , mtl
+    , mustache
+    , neat-interpolation
+    , network-uri
+    , optparse-applicative
+    , parsec
+    , raw-strings-qq
+    , socket
+    , spacecookie
+    , split
+    , systemd
+    , table-layout ==0.9.1.0
+    , text
+    , time
+    , unix
+    , unordered-containers
+    , vector
+    , word-wrap ==0.4.1
+    , xml-conduit
+    , xml-conduit-writer
+    , yaml
+  default-language: Haskell2010

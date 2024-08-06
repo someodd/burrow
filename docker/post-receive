@@ -1,0 +1,6 @@
+#!/bin/sh
+git clone /srv/git/gopherhole.git /tmp/gopherhole-clone
+cd /tmp/gopherhole-clone
+burrow build --spacecookie
+#chown -R spacecookie:spacecookie /srv/gopher
+rm -rf /tmp/gopherhole-clone

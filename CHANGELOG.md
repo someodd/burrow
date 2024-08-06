@@ -7,17 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Lots of stuff related to the project but not necessarily a part of the version software
+update, like release management, docker file.
+
 ### Added
 
-...
-
-### Fixed
-
-...
+* Built-in Spacecookie server, now accessible through the burrow CLI
 
 ### Changed
 
-...
+* CLI commands (because of the introduction of the spacecoookie server)
 
 ## [0.1.15.0] - 2024-06-27: Production-oriented
 

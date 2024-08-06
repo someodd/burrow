@@ -1,40 +1,76 @@
 name: Release
 
-# should do this only on master as well?
-on: 
+on:
   push:
-    paths:
-      burrow.cabal
+    tags:
+      - 'v*'
 
 jobs:
-  # Release job
-  release:
+  create_release:
+    name: Create Release
     runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.VERSION }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Detect version change in cabal
-        id: version-check
-        uses: salsify/action-detect-and-tag-new-version@v2
-        with:
-          version-command: |
-            sed -n "s/^version:[[:space:]]\+\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\)\+/\1/p" burrow.cabal
-      - name: Make static binary tar.gz
-        if: ${{ steps.version-check.outputs.tag }}
-        run: make release GHC_VERSION=8.10.4
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v1
-        if: ${{ steps.version-check.outputs.tag }}
-        with:
-          name: ${{ steps.version-check.outputs.tag }}
-          tag_name: ${{ steps.version-check.outputs.tag }}
-          prerelease: true
-          fail_on_unmatched_files: true
-          files: |
-            ./burrow-${{ steps.version-check.outputs.current-version }}-x86_64-linux.tar.gz
-            /tmp/burrow_${{ steps.version-check.outputs.current-version }}_amd64.deb
-          body: Unstable/alpha release.
+      
+      - name: Get version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/v}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+
+  build:
+    name: Build and Upload Release Asset
+    needs: create_release
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Get system information
+      id: sysinfo
+      run: |
+        echo "kernel=$(uname -r)" >> $GITHUB_OUTPUT
+        echo "libc=$(ldd --version | awk '/ldd/{print $NF}')" >> $GITHUB_OUTPUT
+        echo "distro=$(lsb_release -si)$(lsb_release -sr)" >> $GITHUB_OUTPUT
+
+    - name: Setup Haskell
+      uses: haskell/actions/setup@v1
+      with:
+        ghc-version: '9.2.5'
+        cabal-version: '3.6'
+
+    - name: Install fpm
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ruby ruby-dev rubygems build-essential
+        sudo gem install --no-document fpm
+
+    - name: Build and Package
+      run: |
+        chmod +x ./package.sh
+        ./package.sh ${{ steps.sysinfo.outputs.kernel }} ${{ steps.sysinfo.outputs.libc }} ${{ steps.sysinfo.outputs.distro }}
+    
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        asset_path: ./burrow_${{ needs.create_release.outputs.version }}_amd64_${{ steps.sysinfo.outputs.distro }}_kernel${{ steps.sysinfo.outputs.kernel }}_libc${{ steps.sysinfo.outputs.libc }}.deb
+        asset_name: burrow_${{ needs.create_release.outputs.version }}_amd64_${{ steps.sysinfo.outputs.distro }}_kernel${{ steps.sysinfo.outputs.kernel }}_libc${{ steps.sysinfo.outputs.libc }}.deb
+        asset_content_type: application/vnd.debian.binary-package

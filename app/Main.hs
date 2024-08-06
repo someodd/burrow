@@ -1,24 +1,25 @@
--- FIXME: use filepath to create good paths 
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Build
+-- Assuming there's a module to handle the serving functionality
+-- import Serve
 
 import Options.Applicative hiding (ParseError)
 import Paths_burrow (version)
 import Data.Version (showVersion)
+import SpacecookieClone.Serve (runServer)
 
 parserPrefs :: ParserPrefs
 parserPrefs = defaultPrefs
   { prefShowHelpOnEmpty = True
   }
 
--- bad practice (should have options be a separate type
 data SubCommand
   = Build { buildSpacecookie :: Bool }
+  | Serve { configFile :: FilePath } -- Added Serve constructor
   deriving Show
 
--- | The main CLI interface for the main CLI parser.
 data MainOptions = MainOptions
   { subcommand :: SubCommand
   } deriving Show
@@ -34,23 +35,31 @@ subCommands =
   hsubparser
     ( command "build" (info buildSubCommand
         ( progDesc "Create gopherhole according to gopherhole.ini" ))
+    <> command "serve" (info serveSubCommand
+        ( progDesc "Launch spacecookie server with given configuration" ))
     )
 
 buildSubCommand :: Parser SubCommand
 buildSubCommand = Build <$>
-  ( switch
-      (long "spacecookie" <> help "Parse index.md.mustache files to .gophermap files")
-  )
+  switch
+    (long "spacecookie" <> help "Parse index.md.mustache files to .gophermap files")
+
+serveSubCommand :: Parser SubCommand
+serveSubCommand = Serve <$>
+  strOption
+    (long "config" <> metavar "FILE" <>
+     help "Path to spacecookie configuration file")
 
 mainParser :: ParserInfo MainOptions
 mainParser = info (helper <*> versionOption <*> mainCommand)
-      (fullDesc <> progDesc ("burrow v" <> (showVersion version)) <>
+      (fullDesc <> progDesc ("burrow v" <> showVersion version) <>
        header "Build elaborate static gopherholes using Mustache and Markdown.")
 
--- FIXME: show help by default if no action specified
--- FIXME: make it so build is only one of many options/actions. you can also create phlog posts and list tags. Use a phlog post template?
 main :: IO ()
 main = do
   opts <- customExecParser parserPrefs mainParser
   case subcommand opts of
-    Build buildOptions -> buildGopherhole (buildOptions)
+    Build buildOptions -> buildGopherhole buildOptions
+    Serve serveConfigFile -> do
+      putStrLn $ "Serving using config: " ++ serveConfigFile
+      runServer serveConfigFile

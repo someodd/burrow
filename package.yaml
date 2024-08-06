@@ -25,6 +25,12 @@ ghc-options:
 dependencies:
   - base >= 4.12 && < 4.15
   - text
+  - spacecookie
+  - filepath-bytestring
+  - socket
+  - systemd
+  - unix
+  - fast-logger
   - errata == 0.3.0.0
   - xml-conduit-writer
   - parsec
@@ -61,6 +67,10 @@ dependencies:
 library:
   source-dirs: src
   exposed-modules:
+    - SpacecookieClone.Serve
+    - SpacecookieClone.Config
+    - SpacecookieClone.FileType
+    - SpacecookieClone.Systemd
     - TextUtils
     - TextUtils.Headings
     - Markdown
