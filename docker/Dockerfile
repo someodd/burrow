@@ -1,13 +1,10 @@
-FROM haskell:8.10.2-buster
+FROM debian:bookworm-slim
 MAINTAINER someodd, https://github.com/someodd
 
 RUN apt-get update
 RUN apt-get install -y git
-RUN git clone https://github.com/sternenseemann/spacecookie
-Run cabal update
-RUN cd spacecookie && cabal v2-install .
 RUN useradd spacecookie
-ADD docker/spacecookie.json /etc/spacecookie.json
+ADD spacecookie.json /etc/spacecookie.json
 RUN mkdir -p /srv/gopher
 
 # The git server
@@ -32,7 +29,7 @@ RUN cd /srv/git
 RUN mkdir /srv/git/gopherhole.git
 RUN cd /srv/git/gopherhole.git
 RUN git init --bare /srv/git/gopherhole.git
-ADD docker/post-receive /srv/git/gopherhole.git/hooks/
+ADD post-receive /srv/git/gopherhole.git/hooks/
 #RUN chmod +x /srv/git/gopherhole.git/hooks/post-receive
 USER root
 #RUN adduser gopher
@@ -40,8 +37,10 @@ RUN chsh -s /usr/bin/git-shell git
 
 # now add a server-side git hook for burrow
 RUN apt-get install -y wget
-RUN wget -O /tmp/burrow.deb https://github.com/someodd/burrow/releases/download/v0.1.15.0/burrow_0.1.15.0_amd64.deb
-RUN apt install /tmp/burrow.deb
+ADD latest-deb.sh /tmp/latest-deb.sh
+RUN chmod +x /tmp/latest-deb.sh
+RUN /tmp/latest-deb.sh
+RUN apt-get install /tmp/burrow.deb
 
 RUN apt-get install -y openssh-server
 RUN service ssh start

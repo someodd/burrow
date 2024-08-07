@@ -18,7 +18,7 @@ read -p "Version [was: $CURRENT_VERSION -> suggested: $SUGGESTED_VERSION]: " VER
 sed -i -E "s/^version: [0-9]+(\.[0-9]+)*$/version: $VERSION/" package.yaml
 
 # Update the `CHANGELOG.md``
-./update-changelog.sh "$VERSION"
+./reposcripts/update-changelog.sh "$VERSION"
 
-# Suggest the the tag command like `git tag -a v0.1.16.0 -m "release test + built-in spacecookie server"`
-echo "git tag -a v$VERSION -m \"release test + built-in spacecookie server\""
+# Suggest the the tag command
+echo "git tag -a v$VERSION -m \"message here\""

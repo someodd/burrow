@@ -48,8 +48,8 @@ jobs:
     - name: Build and Package
       id: build_package
       run: |
-        chmod +x ./package.sh
-        PACKAGE_PATH=$(./package.sh | tail -n1)
+        chmod +x ./reposcripts/package.sh
+        PACKAGE_PATH=$(./reposcripts/package.sh | tail -n1)
         echo "package_path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
         echo "Package path: $PACKAGE_PATH"
 

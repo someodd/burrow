@@ -7,3 +7,4 @@ result
 .direnv/
 bin/
 *.deb
+docker/id_rsa.pub

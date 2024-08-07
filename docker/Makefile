@@ -6,13 +6,16 @@ all:
 	set -e;
 
 create_network:
-	docker network create --subnet=172.18.0.0/16 servicenet
+	docker network create --subnet=177.18.0.0/16 servicenet
 
 build:
-	docker build -t spacecookie .
+	docker build -t spacecookie -f docker/Dockerfile docker/
 
 run:
-	docker run -d --restart=always --net servicenet --hostname=spacecookie --ip=172.18.0.68 spacecookie
+	docker run -d --restart=always --net servicenet --hostname=spacecookie --ip=177.18.0.68 spacecookie
+
+run_bigport:
+	docker run -d --restart=always --net servicenet --hostname=spacecookie --ip=177.18.0.68 -p 7000:70 -p 2222:22 spacecookie
 
 test:
 	echo "$(running_id)"

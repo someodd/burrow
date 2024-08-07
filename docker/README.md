@@ -11,12 +11,13 @@ A `Makefile` is included for your convenience:
   * `make create_network`: You should run this first. Creates the Docker network the container will use.
   * `make build`: Build the Docker container.
   * `make run`: Run the Docker container as a daemon.
+  * `make run_bigport`: Run with bigger ports than the defaults for SSH and Gopher.
   * `make shell`: Open the shell of the currently running Docker container.
 
-You can use it from project root like this:
+You must use it from project root like this:
 
 ```
-make -f ./docker/Makefile run
+make -f ./docker/Makefile build
 ```
 
 ## Configure `spacecookie.json`
@@ -46,14 +47,14 @@ Host gopherhole
 	IdentityFile ~/.ssh/id_rsa_hgopher
 ```
 
-Be sure to copy the public key (`*.pub`) for the private key you specified into
-the directory with the `Dockerfile` and `Makefile` (the root of the repo)
-*before* running `make build` (building the container).
+Be sure to copy the public key (`*.pub`) for the private key you specified into the
+directory with the `Dockerfile` and `Makefile` *before* running `make build` (building the
+container).
 
 ### Setup the gopherhole/repo
 
 You'll need to learn about making gopherholes with
-[Burrow](https://github.com/hyperrealgopher/burrow).
+[Burrow](https://github.com/someodd/burrow).
 
 ```
 $ cd myproject
