@@ -10,3 +10,5 @@ It works like this:
 1. Use `prep-release.sh` which will tag with the next release, it'll suggest the release number, but you can review first.
 
   * double-check the `CHANGELOG.md`...
+
+1. check the github action for release and then check the subsequent release cut and the packages attached

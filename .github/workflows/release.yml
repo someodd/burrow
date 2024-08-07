@@ -9,26 +9,18 @@ jobs:
   create_release:
     name: Create Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.VERSION }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Get version
-        id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/v}
 
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
           body_path: CHANGELOG.md
           draft: false
           prerelease: false
@@ -39,14 +31,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-
-    - name: Get system information
-      id: sysinfo
-      run: |
-        echo "kernel=$(uname -r)" >> $GITHUB_OUTPUT
-        echo "libc=$(ldd --version | awk '/ldd/{print $NF}')" >> $GITHUB_OUTPUT
-        echo "distro=$(lsb_release -si)$(lsb_release -sr)" >> $GITHUB_OUTPUT
+    - uses: actions/checkout@v4
 
     - name: Setup Haskell
       uses: haskell/actions/setup@v1
@@ -61,16 +46,14 @@ jobs:
         sudo gem install --no-document fpm
 
     - name: Build and Package
+      id: build_package
       run: |
         chmod +x ./package.sh
-        ./package.sh ${{ steps.sysinfo.outputs.kernel }} ${{ steps.sysinfo.outputs.libc }} ${{ steps.sysinfo.outputs.distro }}
-    
+        PACKAGE_PATH=$(./package.sh | tail -n1)
+        echo "package_path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
+        echo "Package path: $PACKAGE_PATH"
+
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ needs.create_release.outputs.upload_url }}
-        asset_path: ./burrow_${{ needs.create_release.outputs.version }}_amd64_${{ steps.sysinfo.outputs.distro }}_kernel${{ steps.sysinfo.outputs.kernel }}_libc${{ steps.sysinfo.outputs.libc }}.deb
-        asset_name: burrow_${{ needs.create_release.outputs.version }}_amd64_${{ steps.sysinfo.outputs.distro }}_kernel${{ steps.sysinfo.outputs.kernel }}_libc${{ steps.sysinfo.outputs.libc }}.deb
-        asset_content_type: application/vnd.debian.binary-package
+        files: ${{ steps.build_package.outputs.package_path }}
