@@ -2,11 +2,13 @@
 
 Burrow is to gopherholes as static site builders are to websites.
 
-https://github.com/someodd/burrow/releases/tag/v0.1.15.0
-
 Burrow is a *static site generator,* but for gopherholes. A *gopherhole* is a place in *gopherspace* accessed through the [Gopher protocol](https://en.wikipedia.org/wiki/Gopher_%28protocol%29)).
 
-I made my gopherhole with burrow, so it's an example: gopher://gopher.someodd.zip:7071/
+I made my gopherhole with burrow, so it's an example:
+
+  * gopher://gopher.someodd.zip:7071/
+  * https://github.com/someodd/personal-gopherhole
+  * This functional example uses this repo's Docker config, allow me to push to the above repo, and the repo that is used to build my gopherhole (Docker setup is a git + gopher server)
 
 There's a `.deb` (Ubuntu, Debian) available in the releases.
 
