@@ -7,6 +7,11 @@ RUN useradd spacecookie
 ADD spacecookie.json /etc/spacecookie.json
 RUN mkdir -p /srv/gopher
 
+# FIXME: if i don't do this hgetfilecontents or whatever will fail
+RUN apt-get install -y locales
+RUN echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+RUN locale-gen
+
 # The git server
 RUN adduser --disabled-password --gecos "" git
 RUN mkdir -p /srv/git
@@ -45,9 +50,8 @@ RUN apt-get install /tmp/burrow.deb
 RUN apt-get install -y openssh-server
 RUN service ssh start
 
-
-EXPOSE 70
-EXPOSE 22
+EXPOSE 7071
+EXPOSE 2222
 
 ADD ./launch.sh /launch.sh
 RUN chmod +x /launch.sh

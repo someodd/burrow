@@ -1,6 +1,10 @@
 #!/bin/sh
 git clone /srv/git/gopherhole.git /tmp/gopherhole-clone
 cd /tmp/gopherhole-clone
-burrow build --spacecookie
+burrow build
+pkill burrow
+# FIXME: I want to actually copy to /etc/spacecookie.json, but I'm being lazy
+cp /tmp/gopherhole-clone/data/spacecookie.json /tmp/spacecookie.json
 #chown -R spacecookie:spacecookie /srv/gopher
 rm -rf /tmp/gopherhole-clone
+burrow serve --config /tmp/spacecookie.json &
