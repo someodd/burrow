@@ -7,4 +7,4 @@ pkill burrow
 cp /tmp/gopherhole-clone/data/spacecookie.json /tmp/spacecookie.json
 #chown -R spacecookie:spacecookie /srv/gopher
 rm -rf /tmp/gopherhole-clone
-burrow serve --config /tmp/spacecookie.json &
+nohup burrow serve --config /tmp/spacecookie.json > /dev/null 2>&1 &
