@@ -163,7 +163,7 @@ createAtomFeed atomFeedRecipe = do
     element "title" $ content (atomTitle atomFeedRecipe)
     elementA "link" [("href", T.pack base)] $ empty
     elementA "link" [("href", T.pack $ base ++ (atomPath atomFeedRecipe)), ("rel", "self")] $ empty
-    elementA "generator" [("uri", "https://github.com/hyperrealgopher/burrow")] $ content "hyperrealgopher's burrow" 
+    elementA "generator" [("uri", "https://github.com/someodd/burrow")] $ content "someodd's burrow" 
     element "id" $ content (T.pack $ base ++ (atomPath atomFeedRecipe))
     element "updated" $ content lastUpdated--FIXME
     toXML $ AtomFeedEntryRecipe (atomEntries atomFeedRecipe) phlogConfig
