@@ -1,5 +1,5 @@
 name: burrow
-version: 0.2.0.0
+version: 0.3.0.0
 synopsis: Build gopherholes.
 description: |
   Static site builder, but for gopherholes. Manage phlogs with tags, use the Markdown renderer and Mustache templating system.
