@@ -1,5 +1,9 @@
 # Contributing
 
+## Testing
+
+You can use Stack to build, then actually build the gopherhole with `stack run --no-haddock build` then change to the directory you want to serve, like `built` and then run the serve command with `stack run --no-haddock -- serve --config ../data/spacecookie.json` and visit with `gopher -p "/" localhost 7070`.
+
 ## Releases
 
 Releases are managed through GitHub Actions. Please see `.github/workflows/release.yml`.

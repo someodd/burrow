@@ -249,13 +249,14 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
     tagPath <- getConfigValue configParser "phlog" "tagPath"
     let outputPath = buildPath </> phlogPath' </> ".gophermap"
         phlogIndex = runReader mainPhlogIndex currentYear
-    writeFile outputPath $ makePhlogIndexPage phlogIndex tagPath
+    writeFile outputPath $ makePhlogIndexPage phlogIndex tagPath phlogPath'
    where
-    makePhlogIndexPage :: [PostMeta] -> FilePath -> String
-    makePhlogIndexPage postMetas tagIndexPath =
+    makePhlogIndexPage :: [PostMeta] -> FilePath -> FilePath -> String
+    makePhlogIndexPage postMetas tagIndexPath phlogPathRelative =
       let viewByTagsEntry = show $ MenuLink "1" "view by tags" tagIndexPath Nothing Nothing
+          atomEntry = show $ MenuLink "0" "atom feed" (phlogPathRelative </> "main.xml") Nothing Nothing
           allThePosts = "all phlog posts\n" ++ (intercalate "\n" $ map (makeLocalLink) postMetas)
-      in viewByTagsEntry ++ "\n" ++ allThePosts
+      in atomEntry ++ "\n" ++ viewByTagsEntry ++ "\n" ++ allThePosts
 
   renderAtom (MainPhlogIndex mainPhlogIndex) = do
     currentYear <- getCurrentYear
@@ -386,16 +387,21 @@ instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
     configParser <- getConfig
     tagIndexPath <- getConfigValue configParser "phlog" "tagPath"
     buildPath <- getConfigValue configParser "general" "buildPath"
+    phlogPath' <- getConfigValue configParser "phlog" "phlogPath"
     let outputPath = buildPath </> tagIndexPath </> (T.unpack tag) </> ".gophermap"
         outputDirectoryPath = takeDirectory outputPath
     createDirectoryIfMissing True outputDirectoryPath
-    writeFile outputPath (tagIndexContents tag)
+    writeFile outputPath (tagIndexContents phlogPath')
    where
     -- FIXME: no need for second argument Tag
-    tagIndexContents :: Tag -> String
-    tagIndexContents _ =
+    -- atomEntry = show $ MenuLink "1" "atom feed for this tag" (phlogPathRelative </> "tags" </> (T.unpack tag) </> ".xml") Nothing Nothing
+    tagIndexContents :: String -> String
+    tagIndexContents phlogPathRelative =
       -- fromjust bad! FIXME
-      (T.unpack tag) ++ "\n\n" ++ (intercalate "\n" $ map makeLocalLink specificTagIndexes)
+      let
+        atomEntry = show $ MenuLink "0" "atom feed for this tag" (phlogPathRelative </> "tags" </> (T.unpack tag) ++ ".xml") Nothing Nothing
+      in
+        (T.unpack tag) ++ "\n" ++ atomEntry ++ "\n\n" ++ (intercalate "\n" $ map makeLocalLink specificTagIndexes)
 
   renderAtom (SpecificTagIndex (tag, phlogIndex)) = do
     phlogConfig <- getPhlogConfig
