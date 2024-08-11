@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* Menu links to the main phlog index and per tag atom feeds
+
+### Changed
+
+* Author name changed for generator (Atom/XML)
+
 ## [0.2.0.0] - 2024-08-05
 
 Lots of stuff related to the project but not necessarily a part of the version software
