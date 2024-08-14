@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* Font error and warning messages + automatic resolution
+
 ## [0.3.0.0] - 2024-08-10
 
 ### Added
