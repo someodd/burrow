@@ -2,7 +2,7 @@
 --
 -- The user can use the configuration file to tweak various settings
 -- altering the gopherhole building process.
-module Config (getConfig, getConfigValue, ConfigParser) where
+module Config (getConfig, getConfigValue, getConfigValuePolymorphic, ConfigParser) where
 
 import Data.ConfigFile
 
@@ -28,6 +28,14 @@ getConfig = do
 -- | Easy way to read a configuration value from file.
 getConfigValue :: ConfigParser -> SectionSpec -> OptionSpec -> IO String
 getConfigValue configParser section option =
+  let potentialValue = get configParser section option
+  in case potentialValue of
+    Left readError -> error $ show readError
+    Right value -> pure value
+
+-- | Easy way to read a configuration value from file.
+getConfigValuePolymorphic :: Get_C a => ConfigParser -> SectionSpec -> OptionSpec -> IO a
+getConfigValuePolymorphic configParser section option =
   let potentialValue = get configParser section option
   in case potentialValue of
     Left readError -> error $ show readError

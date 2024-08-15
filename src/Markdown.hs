@@ -50,6 +50,8 @@ data Environment =
     , envPreserveLineBreaks :: Bool
     , envBucktooth :: Bool
     -- ^ use the bucktooth/spacecookie format of .gophermap menus.
+    , envAsciiSafe :: Bool
+    -- ^ Avoid rendering non-ASCII characters (terminal compatibility).
     }
 
 
@@ -397,8 +399,16 @@ instance Rangeable (ParseEnv GopherPage) => IsInline (ParseEnv GopherPage) where
   entity t = pure $ Block [InfoLineToken t]
   escapedChar c = pure $ Block [InfoLineToken $ T.pack $ c:[]]
 
-  emph penv = fmap (transformLines italicize) penv
-  strong penv = fmap (transformLines embolden) penv
+  emph penv = do
+    environment <- ask
+    if envAsciiSafe environment
+      then penv
+      else fmap (transformLines italicize) penv
+  strong penv = do
+    environment <- ask
+    if envAsciiSafe environment
+      then penv
+      else fmap (transformLines embolden) penv
 
   -- FIXME: link
   link target title penv = do

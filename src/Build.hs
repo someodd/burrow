@@ -250,6 +250,14 @@ parseMustache mainText recipe = do
     mainTemplate <- automaticCompileText mainText
     pure mainTemplate
 
+envFromConfig :: IO Environment
+envFromConfig = do
+  allTheAsciiFonts <- getAsciiFonts
+  config <- getConfig
+  host <- T.pack <$> getConfigValue config "general" "host"
+  port <- T.pack <$> getConfigValue config "general" "port"
+  asciiSafe <- getConfigValuePolymorphic config "general" "asciiSafe"
+  pure Environment { envFonts = allTheAsciiFonts, envMenuLinks = Just (host, port), envPreserveLineBreaks = True, envBucktooth = False, envAsciiSafe = asciiSafe }
 
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
 parseMarkdown :: Bool -> ContentType -> T.Text -> IO T.Text
@@ -258,20 +266,17 @@ parseMarkdown _ GopherFileType contents = do
   case out of
     Left parseError -> error $ show parseError
     Right penv -> do
-      allTheAsciiFonts <- getAsciiFonts
-      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = Nothing, envPreserveLineBreaks = True, envBucktooth = False }
+      envPending <- envFromConfig
+      let env = envPending { envMenuLinks = Nothing, envPreserveLineBreaks = True, envBucktooth = False }
       pure . gopherMenuToText env $ (runReader penv env :: GopherPage)
 parseMarkdown bucktooth GopherMenuType contents = do
   out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherPage))
-  config <- getConfig
-  host <- T.pack <$> getConfigValue config "general" "host"
-  port <- T.pack <$> getConfigValue config "general" "port"
   case out of
     Left parseError -> error $ show parseError
     Right penv -> do
-      allTheAsciiFonts <- getAsciiFonts
+      envPending <- envFromConfig
       -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
-      let env = Environment { envFonts = allTheAsciiFonts, envMenuLinks = Just (host, port), envPreserveLineBreaks = True, envBucktooth = bucktooth }
+      let env = envPending { envPreserveLineBreaks = True, envBucktooth = bucktooth }
       pure . gopherMenuToText env $ (runReader penv env :: GopherPage)
 
 
