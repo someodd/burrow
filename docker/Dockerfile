@@ -50,6 +50,20 @@ RUN apt-get install /tmp/burrow.deb
 RUN apt-get install -y openssh-server
 RUN service ssh start
 
+# Add the update script
+RUN apt-get install -y cron
+ADD auto_update.sh /usr/local/bin/auto_update.sh
+RUN chmod +x /usr/local/bin/auto_update.sh
+
+# Add crontab entry if the flag is set
+ARG SYNC_MODE=false
+RUN if [ "$SYNC_MODE" = "true" ]; then \
+    echo "0 * * * * /usr/local/bin/auto_update.sh" > /etc/cron.d/check_updates; \
+    chmod 0644 /etc/cron.d/check_updates; \
+    crontab /etc/cron.d/check_updates; \
+    service cron start; \
+fi
+
 EXPOSE 7071
 EXPOSE 2222
 

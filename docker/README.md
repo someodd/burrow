@@ -1,10 +1,28 @@
-# burrow Docker server
+# Burrow Docker setup
 
-Docker server setup for automatically building a
-[gopherhole](https://en.wikipedia.org/wiki/Gopher_(protocol)) with
-[Burrow](https://github.com/hyperrealgopher/burrow) every time a commit is
-pushed and serving it with
-[Spacecookie](https://github.com/sternenseemann/spacecookie).
+Docker config to serve a gopherhole built with Burrow. Features:
+
+* `SYNC_MODE` (read section below)
+* git server you can push to, which will trigger a rebuild+restart of your gopherhole
+
+This Docker config is set up so you run commands from the project root.
+
+## Preparation: SYNC_MODE, envvars
+
+* `SYNC_MODE` (a Docker build argument): if set to `true` will:
+  * catch up the container's gopherhole repo to a defined repo on GitHub, whenever a new commit is detected
+  * automatically update Burrow *unless* the `SKIP_BURROW_UPDATES` environmental variable is set to `1`
+  * **Have a known bug** where if the remote github repo has a different version, the container's repo will
+    still get synched to it regardless of which is newer
+* Be sure to edit/look at the `.env` file if you're going to use `SYNC_MODE`!
+
+## Build and run
+
+```
+docker build --build-arg ENABLE_CRON=true -t spacecookie -f docker/Dockerfile docker/
+docker run --env-file docker/.env -d --restart=always --net docker_default --hostname=spacecookie --ip=172.18.0.68 -p 7071:7071 -p 2222:22 spacecookie
+```
+## Makefile
 
 A `Makefile` is included for your convenience:
 
@@ -20,84 +38,69 @@ You must use it from project root like this:
 make -f ./docker/Makefile build
 ```
 
-## Configure `spacecookie.json`
+The `Makefile` may get phased out.
 
-...
+## Client-side configuration
 
-## In case of a problem when building
+The Docker container works by managing the gopherhole as a git repository, in a sense.
 
-If `make build` fails you can try this command instead:
+While you can simply push to GitHub (if using `SYNC_MODE), you can also push directly to
+the gopherhole repo in the container.
 
-```
-docker build --no-cache -t spacecookie .
-```
+This section is devoted to configuring the machine where you edit the gopherhole on and
+push commits from.
 
-## Setup client
+### Client-side SSH configuration
 
 Configure the machine you'll be editing the gopherhole on and pushing commits from.
 
-Put this in your `~/.ssh/config` (set `HostName` to the host/domain/IP address
-where the Docker daemon is hosted and set `IdentityFile` to your private key
-you want to use for pushing commits):
+Add an entry to `~/.ssh/config`, but set `Hostname` to the address/domain the Docker
+container is accessible from. Also associate a private key (`IdentityFile`):
 
 ```
 Host gopherhole
-	HostName 6pb7ikzn72tzuhg6pdlkogwgo4yslf5r6mvktdjzyssfry2uvzxthpyd.onion
+	HostName 192.168.1.25
 	User git
-	IdentityFile ~/.ssh/id_rsa_hgopher
+	IdentityFile ~/.ssh/id_rsa_someodd
 ```
 
-Be sure to copy the public key (`*.pub`) for the private key you specified into the
-directory with the `Dockerfile` and `Makefile` *before* running `make build` (building the
-container).
+Copy the public key (`.pub`, associated with the private key you specified above) to the
+directory containing the `Dockerfile`.
 
-### Setup the gopherhole/repo
+### Client-side gopherhole repo setup
 
 You'll need to learn about making gopherholes with
-[Burrow](https://github.com/someodd/burrow).
+[Burrow](https://github.com/someodd/burrow). Please look at [my personal
+gopherhole](https://github.com/someodd/personal-gopherhole) for an example of what
+`myproject` below should look like.
 
 ```
 $ cd myproject
 $ git init
 $ git add .
 $ git commit -m 'Initial commit'
-$ git remote add origin git@gopherhole:/srv/git/gopherhole.git
-$ git push origin master
+$ git remote add gopherhole git@gopherhole:/srv/git/gopherhole.git
+$ git remote add origin git@github.com:someodd/personal-gopherhole.git # optional! set to GH repo you made for your gopherhole
+$ git push # optional! pushes to github
+$ git push gopherhole
 ```
 
-If you're using Tor you'll want to do `torsocks push origin master`.
+## Optional: Using Tor
 
-You can pull from the repo.  Others can clone it down and push changes back up
-just as easily (if the have the same private key [I'll fix this soon by adding
-all the `*.pub` keys in repo root).
+Just some notes in case you want to make your gopherhole a hidden service.
 
-```
-$ git clone git@gopherhole:/srv/git/project.git
-$ cd project
-$ vim README
-$ git commit -am 'Fix for README file'
-$ git push origin master
-```
+### Client config
 
-## Tor
+On the client machine you may want to `torsocks push gopherhole`.
 
-In case you want to serve via Tor edit your `/etc/tor/torrc/`:
+You may want to set the `HostName` entry on your client machine to your onion address.
+
+### Server config
+
+On the machine hosting the Docker service, edit your `/etc/tor/torrc/` (but match the IP
+and ports used by the Docker container):
 
 ```
 HiddenServicePort 70 172.18.0.68:70
 HiddenServicePort 22 172.18.0.68:22
 ```
-
-## Software used
-
-Some info about the software used.
-
-### Spacecookie version
-
-This repo is setup so the latest GitHub main branch from Spacecookie is always
-used. If you want to upgrade to the latest version simply rebuild the image
-like this:
-
-### Burrow version
-
-...
