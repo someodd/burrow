@@ -2,14 +2,14 @@
 --
 -- The user can use the configuration file to tweak various settings
 -- altering the gopherhole building process.
-module Config (getConfig, getConfigValue, getConfigValuePolymorphic, ConfigParser) where
+module Config (getConfig, getConfigValue, getConfigValuePolymorphic, ConfigParser, burrowGopherholeDefaultConfigPath) where
 
 import Data.ConfigFile
 
 
 -- | The name of the config file a gopherhole uses...
-burrowGopherholeConfig :: FilePath
-burrowGopherholeConfig = "data/gopherhole.ini"
+burrowGopherholeDefaultConfigPath :: FilePath
+burrowGopherholeDefaultConfigPath = "data/gopherhole.ini"
 
 -- | `emptyCP`, but doesn't toLower the options.
 customEmptyCP :: ConfigParser
@@ -17,12 +17,17 @@ customEmptyCP = emptyCP { optionxform = id }
 
 
 -- | Get the ConfigParser from file.
-getConfig :: IO ConfigParser
-getConfig = do
-  val <- readfile customEmptyCP burrowGopherholeConfig
+getConfig :: FilePath -> IO ConfigParser
+getConfig configPath = do
+  val <- readfile customEmptyCP configPath
   case val of
     Left readError -> error $ show readError
     Right cp -> pure cp
+
+-- TODO:
+{- | Load the spacecooke-clone configuration from the INI.
+
+-}
 
 
 -- | Easy way to read a configuration value from file.

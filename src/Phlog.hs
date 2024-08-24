@@ -3,6 +3,11 @@
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{- | Logic for blogging.
+
+I will likely refactor to use recipes or the like.
+
+-}
 module Phlog
   (
   -- * Produce different kinds of indexes for the phlog.
@@ -35,7 +40,7 @@ import Control.Monad.Reader (runReader, Reader, ask)
 import Data.List (sortOn, intercalate, isSuffixOf)
 import qualified Data.Text as T
 
-import Config (getConfig, getConfigValue)
+import Config (getConfigValue, ConfigParser)
 import FrontMatter (FileFrontMatter, FrontMatter(..), getFrontMatter)
 
 
@@ -97,9 +102,8 @@ data PhlogConfig = PhlogConfig
   -- ^ The port of the gopherhole.
   }
 
-getPhlogConfig :: IO PhlogConfig
-getPhlogConfig = do
-  configParser <- getConfig
+getPhlogConfig :: ConfigParser -> IO PhlogConfig
+getPhlogConfig configParser = do
   -- phlog section
   phlogPath' <- getConfigValue configParser "phlog" "phlogPath"
   tagPath' <- getConfigValue configParser "phlog" "tagPath"
@@ -204,7 +208,7 @@ class PhlogIndex a b | b -> a where
   -- | Render the phlog index model file in order to be viewed as a gophermap
   -- in gopherspace.  This includes creating the string/file contents from the
   -- supplied model, which is then written to file.
-  renderIndexGophermap :: b -> IO ()
+  renderIndexGophermap :: ConfigParser -> b -> IO ()
 
   -- TODO:
   -- This could do more work or have two abstract/higher order functoins since
@@ -212,11 +216,11 @@ class PhlogIndex a b | b -> a where
   -- then write the exact same way...
   -- could do a createAtom' b -> document then renderAtom Document -> IO but
   -- that complicates things because path needed
-  renderAtom :: b -> IO ()
+  renderAtom :: ConfigParser -> b -> IO ()
 
   -- | Render both the gophermap and the atom feed.
-  renderAll :: b -> IO ()
-  renderAll b = renderAtom b >> renderIndexGophermap b
+  renderAll :: ConfigParser -> b -> IO ()
+  renderAll config b = renderAtom config b >> renderIndexGophermap config b
 
 
 -- FIXME: no need for reader anymore (year)
@@ -236,14 +240,13 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
       _ <- ask
       pure $ postMetasPairs
 
-  renderIndexGophermap (MainPhlogIndex mainPhlogIndex) = do
+  renderIndexGophermap configParser (MainPhlogIndex mainPhlogIndex) = do
     -- TODO: list main tag index
     -- TODO: 
     --  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
     -- FIXME: directories need to be defined in config
     -- | Create the main phlog index which includes all the posts sorted by date.
     currentYear <- getCurrentYear
-    configParser <- getConfig
     buildPath <- getConfigValue configParser "general" "buildPath"
     phlogPath' <- getConfigValue configParser "phlog" "phlogPath"
     tagPath <- getConfigValue configParser "phlog" "tagPath"
@@ -258,10 +261,9 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
           allThePosts = "all phlog posts\n" ++ (intercalate "\n" $ map (makeLocalLink) postMetas)
       in atomEntry ++ "\n" ++ viewByTagsEntry ++ "\n" ++ allThePosts
 
-  renderAtom (MainPhlogIndex mainPhlogIndex) = do
+  renderAtom config (MainPhlogIndex mainPhlogIndex) = do
     currentYear <- getCurrentYear
-    phlogConfig <- getPhlogConfig
-    config <- getConfig
+    phlogConfig <- getPhlogConfig config
     buildPath <- getConfigValue config "general" "buildPath"
     let phlogIndex = runReader mainPhlogIndex currentYear
         phlogDirectory = phlogPath phlogConfig
@@ -271,10 +273,10 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
     XML.writeFile def (buildPath </> phlogDirectory </> "main.xml") atomFeed
 
 
-renderMainPhlogIndex :: [FileFrontMatter] -> IO ()
-renderMainPhlogIndex pairs = do
+renderMainPhlogIndex :: ConfigParser -> [FileFrontMatter] -> IO ()
+renderMainPhlogIndex config pairs = do
   let mainPhlogIndex = createIndexModel (preparePostsOnlyFromPairs pairs) :: MainPhlogIndex
-  renderAll mainPhlogIndex
+  renderAll config mainPhlogIndex
 
 
 -- | This is for the default date while interpreting FrontMatter dates.
@@ -319,9 +321,8 @@ instance PhlogIndex [PostMeta] MainTagIndex where
       [(tag, [postMeta]) | postMeta <- postMetas, tag <- fromMaybe [] (metaTags postMeta)]-- FIXME: what if no tags? that should error right and be just fine?
 
   -- TODO: rewrite better
-  renderIndexGophermap (MainTagIndex mainTagIndex) = do
+  renderIndexGophermap configParser (MainTagIndex mainTagIndex) = do
     -- get paths from config
-    configParser <- getConfig
     -- FIXME: what if build path from CLI instead of INI? Also why not use getPhlogConfig?
     -- It also doesn't make sense that we have a --spacecookie flag but then we just use
     -- .gophermap by default everywhere.
@@ -355,9 +356,8 @@ instance PhlogIndex [PostMeta] MainTagIndex where
 
   -- FIXME: hardcoded paths!
   -- FIXME/TODO: this is not doing what it should be! very sloppily put together...
-  renderAtom (MainTagIndex mainTagIndexMap) = do
-    phlogConfig <- getPhlogConfig
-    config <- getConfig
+  renderAtom config (MainTagIndex mainTagIndexMap) = do
+    phlogConfig <- getPhlogConfig config
     -- FIXME: what if CLI argument build path override?
     buildPath <- getConfigValue config "general" "buildPath"
     let phlogIndex = foldr ((++) . snd) [] $ HashMap.toList $ mainTagIndexMap
@@ -383,8 +383,7 @@ instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
     -- FIXME
     SpecificTagIndex (tag, postMetasPairs)
 
-  renderIndexGophermap (SpecificTagIndex (tag, specificTagIndexes)) = do
-    configParser <- getConfig
+  renderIndexGophermap configParser (SpecificTagIndex (tag, specificTagIndexes)) = do
     tagIndexPath <- getConfigValue configParser "phlog" "tagPath"
     buildPath <- getConfigValue configParser "general" "buildPath"
     phlogPath' <- getConfigValue configParser "phlog" "phlogPath"
@@ -403,9 +402,8 @@ instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
       in
         (T.unpack tag) ++ "\n" ++ atomEntry ++ "\n\n" ++ (intercalate "\n" $ map makeLocalLink specificTagIndexes)
 
-  renderAtom (SpecificTagIndex (tag, phlogIndex)) = do
-    phlogConfig <- getPhlogConfig
-    config <- getConfig
+  renderAtom config (SpecificTagIndex (tag, phlogIndex)) = do
+    phlogConfig <- getPhlogConfig config
     -- FIXME: what if output directory override cli
     outputDirectory <- getConfigValue config "general" "buildPath"
     let phlogDirectory = phlogPath phlogConfig
@@ -453,12 +451,13 @@ frontMatterHashMapGroup postMetaList (groupName, groupFunction) =
     [ (group, [postMeta]) | postMeta <- postMetaList, group <- (toList $ groupFunction postMeta)]
 
 
--- | Render the tag indexes from a collection of file paths and their
--- associated `FrontMatter` (if any), which contains the tags for that file.
---
--- The tags are written out to the supplied `FilePath`.
-renderTagIndexes :: [FileFrontMatter] -> IO ()
-renderTagIndexes filePathFrontMatter = do
+{- | Render the tag indexes from a collection of file paths and their
+associated `FrontMatter` (if any), which contains the tags for that file.
+
+The tags are written out to the supplied `FilePath`.
+-}
+renderTagIndexes :: ConfigParser -> [FileFrontMatter] -> IO ()
+renderTagIndexes config filePathFrontMatter = do
   let postMetaList = preparePostsOnlyFromPairs filePathFrontMatter
       -- FIXME/TODO: I filter out no tags instead of putting into [] group?
       ppmg@(PostMetasGroup (_, hashMap)) = (frontMatterHashMapGroup postMetaList ("tag", \pm -> fromMaybe [] (metaTags pm)) :: PostMetasGroup Tag)
@@ -466,9 +465,9 @@ renderTagIndexes filePathFrontMatter = do
   -- Only render tag indexes if there are any tags to render.
   if length tagsFound > 0
      then do
-      traverse_ (\x -> renderAll (createIndexModel $ getPostMetasGroupPair ppmg x :: SpecificTagIndex)) tagsFound
+      traverse_ (\x -> renderAll config (createIndexModel $ getPostMetasGroupPair ppmg x :: SpecificTagIndex)) tagsFound
       let mainTagIndex = createIndexModel (preparePostsOnlyFromPairs filePathFrontMatter) :: MainTagIndex
-      renderAll mainTagIndex
+      renderAll config mainTagIndex
      else pure ()
 
 

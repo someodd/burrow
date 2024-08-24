@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* `--config` file to specify `spacecookie.ini`
+* `--watch` to rebuild when changes detected and also serve output
+
 ## [0.5.0.0] - 2024-08-14
 
 ### Added

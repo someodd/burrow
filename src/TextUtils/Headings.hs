@@ -123,9 +123,8 @@ type HeadingLevelFontMap = Map.Map Int AsciiFont
 -- FIXME: if defined more than once, will load in the same fonts over and over!
 -- | Get all the fonts loaded, mapped to a specific heading level,
 -- according to the configuration file.
-getAsciiFonts :: IO HeadingLevelFontMap
-getAsciiFonts = do
-  configParser <- getConfig
+getAsciiFonts :: ConfigParser -> IO HeadingLevelFontMap
+getAsciiFonts configParser = do
   let func level = getConfigValue configParser "fonts" ("h" ++ (show level)) >>= parseFont >>= pure . (,) level
   result <- traverse func [1..6]
   pure $ Map.fromList result

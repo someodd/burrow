@@ -31,6 +31,7 @@ dependencies:
   - systemd
   - unix
   - fast-logger
+  - fsnotify
   - errata == 0.3.0.0
   - xml-conduit-writer
   - parsec

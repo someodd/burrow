@@ -31,12 +31,11 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 
 import Types (ContentType(..))
-import Config (getConfig, getConfigValue)
+import Config (getConfigValue, ConfigParser)
 
 
-getConfigTime :: IO (String)
-getConfigTime = do
-  config <- getConfig
+getConfigTime :: ConfigParser -> IO (String)
+getConfigTime config = do
   timeFormat <- getConfigValue config "general" "timeFormat"
   pure $ timeFormat
 
@@ -188,9 +187,9 @@ data FrontMatter = FrontMatter
 
 -- | Create a list of pairs of (entry name, value) for all the relevant information
 -- one might want to include as a string in a template, file, or post.
-toVariablePairs :: FrontMatter -> IO [(T.Text, T.Text)]
-toVariablePairs frontMatter = do
-  timeFormat <- getConfigTime
+toVariablePairs :: ConfigParser -> FrontMatter -> IO [(T.Text, T.Text)]
+toVariablePairs config frontMatter = do
+  timeFormat <- getConfigTime config
   let toConfigTime = T.pack . HG.timePrint timeFormat
   pure $ foldr addVar []
     [ ("title", fmTitle)

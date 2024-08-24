@@ -2,13 +2,13 @@
 module Main where
 
 import Build
--- Assuming there's a module to handle the serving functionality
--- import Serve
-
 import Options.Applicative hiding (ParseError)
 import Paths_burrow (version)
 import Data.Version (showVersion)
 import SpacecookieClone.Serve (runServer)
+import System.FSNotify
+import Control.Concurrent (threadDelay)
+import Control.Monad (forever)
 
 parserPrefs :: ParserPrefs
 parserPrefs = defaultPrefs
@@ -16,8 +16,9 @@ parserPrefs = defaultPrefs
   }
 
 data SubCommand
-  = Build { buildSpacecookie :: Bool }
-  | Serve { configFile :: FilePath } -- Added Serve constructor
+  = Build { buildSpacecookie :: Bool, gopherholeIni :: Maybe FilePath }
+  -- ^ Subcommand to build a gopherhole.
+  | Serve { spacecookieJson :: FilePath, watchChanges :: Bool }
   deriving Show
 
 data MainOptions = MainOptions
@@ -40,15 +41,20 @@ subCommands =
     )
 
 buildSubCommand :: Parser SubCommand
-buildSubCommand = Build <$>
-  switch
-    (long "spacecookie" <> help "Parse index.md.mustache files to .gophermap files")
+buildSubCommand = Build
+  <$> switch
+        (long "spacecookie" <> help "Parse index.md.mustache files to .gophermap files")
+  <*> optional (strOption
+        (long "config" <> metavar "FILE" <>
+         help "Path to gopherhole configuration file (default: gopherhole.ini)"))
 
 serveSubCommand :: Parser SubCommand
-serveSubCommand = Serve <$>
-  strOption
-    (long "config" <> metavar "FILE" <>
-     help "Path to spacecookie configuration file")
+serveSubCommand = Serve
+  <$> strOption
+        (long "config" <> metavar "FILE" <>
+         help "Path to spacecookie configuration file")
+  <*> switch
+        (long "watch" <> help "Watch for changes in burrowsrc and rebuild")
 
 mainParser :: ParserInfo MainOptions
 mainParser = info (helper <*> versionOption <*> mainCommand)
@@ -59,7 +65,23 @@ main :: IO ()
 main = do
   opts <- customExecParser parserPrefs mainParser
   case subcommand opts of
-    Build buildOptions -> buildGopherhole buildOptions
-    Serve serveConfigFile -> do
-      putStrLn $ "Serving using config: " ++ serveConfigFile
-      runServer serveConfigFile
+    -- why isn't spacecookie a config setting?! change that!
+    Build buildSpacecookieFlag maybeConfigPath -> do
+      buildGopherhole maybeConfigPath buildSpacecookieFlag
+    Serve spacecookiePath watch -> do
+      putStrLn $ "Serving using config: " ++ spacecookiePath
+      if watch
+        then do
+          putStrLn "Watching for changes in burrowsrc..."
+          withManager $ \mgr -> do
+            _ <- watchDir
+              mgr
+              "burrowsrc"
+              (const True)
+              (\_ -> do
+                  putStrLn "Change detected, rebuilding..."
+                  buildGopherhole (Just spacecookiePath) True
+                  putStrLn "Rebuild complete.")
+            runServer spacecookiePath
+            forever $ threadDelay 1000000
+        else runServer spacecookiePath
