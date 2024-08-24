@@ -51,7 +51,6 @@ dependencies:
   - filepath
   - optparse-applicative
   - mtl
-  - ConfigFile
   - commonmark
   - frontmatter
   - attoparsec

@@ -47,8 +47,7 @@ library
       OverloadedStrings
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror
   build-depends:
-      ConfigFile
-    , aeson
+      aeson
     , attoparsec
     , base >=4.12 && <4.15
     , bytestring
@@ -103,8 +102,7 @@ executable burrow
       OverloadedStrings
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Werror
   build-depends:
-      ConfigFile
-    , aeson
+      aeson
     , attoparsec
     , base >=4.12 && <4.15
     , burrow
