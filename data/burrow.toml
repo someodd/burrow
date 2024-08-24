@@ -2,64 +2,55 @@
 
 # The ASCII art font files used for each heading level.
 [fonts]
-h1=data/fonts/figlet_graceful.bmf
-h2=data/fonts/simple_octo.bmf
-h3=data/fonts/simple_underline.bmf
-h4=data/fonts/simplest.bmf
-h5=data/fonts/simplest.bmf
-h6=data/fonts/simplest.bmf
+h1="data/fonts/figlet_graceful.bmf"
+h2="data/fonts/simple_octo.bmf"
+h3="data/fonts/simple_underline.bmf"
+h4="data/fonts/simplest.bmf"
+h5="data/fonts/simplest.bmf"
+h6="data/fonts/simplest.bmf"
 
-# The spacecookie-clone configuration.
-# ...
-; {
-;   "hostname" : "localhost",
-;   "listen" : {
-;     "addr" : "::",
-;     "port" : 7070
-;   },
-;   "user" : null,
-;   "root" : "./",
-;   "log" : {
-;     "enable" : true,
-;     "hide-ips" : true,
-;     "hide-time" : false,
-;     "level" : "info"
-;   }
-; }
+# The built-in spacecookie gopherhole server configuration, formerly fulfilled by a
+# spacecookie.json file.
+[spacecookie]
+# These few below are maybe redundant with the host and port in general!
+hostname="localhost"
+listenAddr="::"
+listenPort=7070
+# Un-comment line below to switch a specified user when running server.
+#user="nobody"
+# I wonder if the root directory to serve in spacecookie is redundant considering buildPath in general.
+root="./built/"
 
-
-# FIXME: the .gophermap part doesn't work because the links will just be expecting without that! so should just assume it will be in there
-# FIXME: better names
+# Blogging-specific configuration.
 [phlog]
 # The phlog's location inside both the buildPath and sourcePath.
-phlogPath=phlog
-tagPath=phlog/tags/
-defaultAuthor=Some Gopher
-
+phlogPath="phlog"
+tagPath="phlog/tags/"
+defaultAuthor="Some Gopher"
 
 [general]
 # Everything built will go into this path. All other paths will be relative to
 # this path.
-buildPath=built
+buildPath="built"
 # The main content files used for building the gopherhole.
-sourcePath=burrowsrc
+sourcePath="burrowsrc"
 # The host and port the gopherhole will listen on. This is important due to the nature of
 # hosting gophermaps (they need to specify a link's host and port).
-host=localhost
+host="localhost"
 port=7070
 # This directive informs the builder to build, not just copy, any file
 # with these extensions. Do not include the leading dot. Separate with
 # spaces.
-buildExtensions=md
+buildExtensions="md"
 # This helps the builer know which files are menus when it can't read
 # the frontmatter or if you don't want to specify in the frontmatter.
 # So it'll allow gophermaps to be built out of something like
 # *.menu.txt and *.menu.md.
-menuExtensionPrefix=menu
+menuExtensionPrefix="menu"
 # The format used for timestamps in teh templater.
-timeFormat=YYYY-MM-DD
+timeFormat="YYYY-MM-DD"
 # Filename used for gophermap indexes (will use the .gophermap specification, which
 # gives it more flexibility. See .gophermap in spacecookie documentation).
-directoryMapName=index.menu.md
+directoryMapName="index.menu.md"
 # Avoid using non-ASCII characters when rendering for terminal compatibility.
-asciiSafe=on
+asciiSafe=true

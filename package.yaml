@@ -32,6 +32,7 @@ dependencies:
   - unix
   - fast-logger
   - fsnotify
+  - tomland
   - errata == 0.3.0.0
   - xml-conduit-writer
   - parsec

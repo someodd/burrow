@@ -40,7 +40,7 @@ import Control.Monad.Reader (runReader, Reader, ask)
 import Data.List (sortOn, intercalate, isSuffixOf)
 import qualified Data.Text as T
 
-import Config (getConfigValue, ConfigParser)
+import qualified Config
 import FrontMatter (FileFrontMatter, FrontMatter(..), getFrontMatter)
 
 
@@ -89,6 +89,11 @@ preparePostsOnlyFromPairs filePathFrontMatterPairs = do
   [postMeta | pair@(_, Just frontMatter) <- filePathFrontMatterPairs, fromMaybe False (fmType frontMatter >>= \t -> Just $ t == "post"), let (Just postMeta) = pairToPostMeta pair]
 
 
+{- | Phlog meta/config.
+
+This is redundant and may get removed in the near future.
+
+-}
 data PhlogConfig = PhlogConfig
   { phlogPath :: FilePath
   -- ^ Path to the phlog directory.
@@ -102,22 +107,25 @@ data PhlogConfig = PhlogConfig
   -- ^ The port of the gopherhole.
   }
 
-getPhlogConfig :: ConfigParser -> IO PhlogConfig
-getPhlogConfig configParser = do
-  -- phlog section
-  phlogPath' <- getConfigValue configParser "phlog" "phlogPath"
-  tagPath' <- getConfigValue configParser "phlog" "tagPath"
-  defaultAuthor' <- getConfigValue configParser "phlog" "defaultAuthor"
-  -- general section
-  host' <- getConfigValue configParser "general" "host"
-  port' <- getConfigValue configParser "general" "port"
-  pure $ PhlogConfig
-    { phlogPath = phlogPath'
-    , phlogTagPath = tagPath'
-    , phlogDefaultAuthor = defaultAuthor'
-    , phlogHost = host'
-    , phlogPort = port'
-    }
+
+getPhlogConfig :: Config.Config -> PhlogConfig
+getPhlogConfig config =
+  let
+    -- phlog section
+    phlogPath' = Config.phlogPath (Config.phlog config) 
+    tagPath' = Config.tagPath (Config.phlog config) 
+    defaultAuthor' = Config.defaultAuthor (Config.phlog config) 
+    -- general section; FIXME: spacecookie section now?
+    host' = Config.host (Config.general config) 
+    port' = Config.port (Config.general config)
+  in
+    PhlogConfig
+      { phlogPath = T.unpack phlogPath'
+      , phlogTagPath = T.unpack tagPath'
+      , phlogDefaultAuthor = T.unpack defaultAuthor'
+      , phlogHost = T.unpack host'
+      , phlogPort = show port'
+      }
 
 
 data AtomFeedRecipe = AtomFeedRecipe
@@ -192,6 +200,9 @@ createAtomFeed atomFeedRecipe = do
 --
 -- Type `a` is what will create the model (type `b`) used in creating the
 -- gophermap as well as the Atom feed.
+--
+-- Note in the future I may change passing around the config for just ensuring
+-- you define a Reader Config ... or something like that.
 class PhlogIndex a b | b -> a where
   -- | Sort the index model.
   sortIndexModel :: b -> b
@@ -208,7 +219,7 @@ class PhlogIndex a b | b -> a where
   -- | Render the phlog index model file in order to be viewed as a gophermap
   -- in gopherspace.  This includes creating the string/file contents from the
   -- supplied model, which is then written to file.
-  renderIndexGophermap :: ConfigParser -> b -> IO ()
+  renderIndexGophermap :: Config.Config -> b -> IO ()
 
   -- TODO:
   -- This could do more work or have two abstract/higher order functoins since
@@ -216,10 +227,10 @@ class PhlogIndex a b | b -> a where
   -- then write the exact same way...
   -- could do a createAtom' b -> document then renderAtom Document -> IO but
   -- that complicates things because path needed
-  renderAtom :: ConfigParser -> b -> IO ()
+  renderAtom :: Config.Config -> b -> IO ()
 
   -- | Render both the gophermap and the atom feed.
-  renderAll :: ConfigParser -> b -> IO ()
+  renderAll :: Config.Config -> b -> IO ()
   renderAll config b = renderAtom config b >> renderIndexGophermap config b
 
 
@@ -240,19 +251,20 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
       _ <- ask
       pure $ postMetasPairs
 
-  renderIndexGophermap configParser (MainPhlogIndex mainPhlogIndex) = do
+  renderIndexGophermap config (MainPhlogIndex mainPhlogIndex) = do
     -- TODO: list main tag index
     -- TODO: 
     --  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
     -- FIXME: directories need to be defined in config
     -- | Create the main phlog index which includes all the posts sorted by date.
     currentYear <- getCurrentYear
-    buildPath <- getConfigValue configParser "general" "buildPath"
-    phlogPath' <- getConfigValue configParser "phlog" "phlogPath"
-    tagPath <- getConfigValue configParser "phlog" "tagPath"
-    let outputPath = buildPath </> phlogPath' </> ".gophermap"
-        phlogIndex = runReader mainPhlogIndex currentYear
-    writeFile outputPath $ makePhlogIndexPage phlogIndex tagPath phlogPath'
+    let
+      buildPath = T.unpack $ Config.buildPath (Config.general config)
+      phlogPath' = T.unpack $ Config.phlogPath (Config.phlog config)
+      tagPath' = T.unpack $ Config.tagPath (Config.phlog config)
+      outputPath = buildPath </> phlogPath' </> ".gophermap"
+      phlogIndex = runReader mainPhlogIndex currentYear
+    writeFile outputPath $ makePhlogIndexPage phlogIndex tagPath' phlogPath'
    where
     makePhlogIndexPage :: [PostMeta] -> FilePath -> FilePath -> String
     makePhlogIndexPage postMetas tagIndexPath phlogPathRelative =
@@ -263,8 +275,8 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
 
   renderAtom config (MainPhlogIndex mainPhlogIndex) = do
     currentYear <- getCurrentYear
-    phlogConfig <- getPhlogConfig config
-    buildPath <- getConfigValue config "general" "buildPath"
+    let phlogConfig = getPhlogConfig config
+        buildPath = T.unpack $ Config.buildPath (Config.general config)
     let phlogIndex = runReader mainPhlogIndex currentYear
         phlogDirectory = phlogPath phlogConfig
         -- FIXME
@@ -273,7 +285,7 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
     XML.writeFile def (buildPath </> phlogDirectory </> "main.xml") atomFeed
 
 
-renderMainPhlogIndex :: ConfigParser -> [FileFrontMatter] -> IO ()
+renderMainPhlogIndex :: Config.Config -> [FileFrontMatter] -> IO ()
 renderMainPhlogIndex config pairs = do
   let mainPhlogIndex = createIndexModel (preparePostsOnlyFromPairs pairs) :: MainPhlogIndex
   renderAll config mainPhlogIndex
@@ -321,14 +333,15 @@ instance PhlogIndex [PostMeta] MainTagIndex where
       [(tag, [postMeta]) | postMeta <- postMetas, tag <- fromMaybe [] (metaTags postMeta)]-- FIXME: what if no tags? that should error right and be just fine?
 
   -- TODO: rewrite better
-  renderIndexGophermap configParser (MainTagIndex mainTagIndex) = do
+  renderIndexGophermap config (MainTagIndex mainTagIndex) = do
     -- get paths from config
     -- FIXME: what if build path from CLI instead of INI? Also why not use getPhlogConfig?
     -- It also doesn't make sense that we have a --spacecookie flag but then we just use
     -- .gophermap by default everywhere.
-    buildPath <- getConfigValue configParser "general" "buildPath"
-    tagPath <- getConfigValue configParser "phlog" "tagPath"
-    let mainTagIndexPath = buildPath </> tagPath </> ".gophermap"
+    let
+      buildPath = T.unpack $ Config.buildPath (Config.general config)
+      tagPath = T.unpack $ Config.tagPath (Config.phlog config)
+      mainTagIndexPath = buildPath </> tagPath </> ".gophermap"
 
     -- write out the main tag index
     createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
@@ -357,13 +370,13 @@ instance PhlogIndex [PostMeta] MainTagIndex where
   -- FIXME: hardcoded paths!
   -- FIXME/TODO: this is not doing what it should be! very sloppily put together...
   renderAtom config (MainTagIndex mainTagIndexMap) = do
-    phlogConfig <- getPhlogConfig config
-    -- FIXME: what if CLI argument build path override?
-    buildPath <- getConfigValue config "general" "buildPath"
-    let phlogIndex = foldr ((++) . snd) [] $ HashMap.toList $ mainTagIndexMap
-        phlogDirectory = phlogPath phlogConfig
-        atomRelativePath = phlogDirectory </> "tagSummary.xml"
-        atomFeed = (createAtomFeed $ AtomFeedRecipe "Tag Summaries" phlogIndex phlogConfig atomRelativePath) -- FIXME: path
+    let
+      phlogConfig = getPhlogConfig config
+      buildPath = T.unpack $ Config.buildPath (Config.general config)
+      phlogIndex = foldr ((++) . snd) [] $ HashMap.toList $ mainTagIndexMap
+      phlogDirectory = phlogPath phlogConfig
+      atomRelativePath = phlogDirectory </> "tagSummary.xml"
+      atomFeed = (createAtomFeed $ AtomFeedRecipe "Tag Summaries" phlogIndex phlogConfig atomRelativePath) -- FIXME: path
     createDirectoryIfMissing True $ buildPath </> phlogDirectory
     XML.writeFile def (buildPath </> atomRelativePath) atomFeed
 
@@ -384,11 +397,12 @@ instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
     SpecificTagIndex (tag, postMetasPairs)
 
   renderIndexGophermap configParser (SpecificTagIndex (tag, specificTagIndexes)) = do
-    tagIndexPath <- getConfigValue configParser "phlog" "tagPath"
-    buildPath <- getConfigValue configParser "general" "buildPath"
-    phlogPath' <- getConfigValue configParser "phlog" "phlogPath"
-    let outputPath = buildPath </> tagIndexPath </> (T.unpack tag) </> ".gophermap"
-        outputDirectoryPath = takeDirectory outputPath
+    let
+      tagIndexPath = T.unpack $ Config.tagPath (Config.phlog configParser)
+      buildPath = T.unpack $ Config.buildPath (Config.general configParser)
+      phlogPath' = T.unpack $ Config.phlogPath (Config.phlog configParser)
+      outputPath = buildPath </> tagIndexPath </> (T.unpack tag) </> ".gophermap"
+      outputDirectoryPath = takeDirectory outputPath
     createDirectoryIfMissing True outputDirectoryPath
     writeFile outputPath (tagIndexContents phlogPath')
    where
@@ -403,15 +417,15 @@ instance PhlogIndex (PostMetasGroupPair Tag) SpecificTagIndex where
         (T.unpack tag) ++ "\n" ++ atomEntry ++ "\n\n" ++ (intercalate "\n" $ map makeLocalLink specificTagIndexes)
 
   renderAtom config (SpecificTagIndex (tag, phlogIndex)) = do
-    phlogConfig <- getPhlogConfig config
-    -- FIXME: what if output directory override cli
-    outputDirectory <- getConfigValue config "general" "buildPath"
-    let phlogDirectory = phlogPath phlogConfig
-        feedRelativePath = phlogDirectory </> "tags" </> (T.unpack tag <.> "xml")
-        outputPath = outputDirectory </> feedRelativePath
-        metas = phlogIndex
-        -- FIXME
-        atomFeed = (createAtomFeed $ AtomFeedRecipe (T.pack $ (T.unpack tag) ++ " tag phlog feed") metas phlogConfig feedRelativePath)
+    let
+      phlogConfig = getPhlogConfig config
+      outputDirectory = T.unpack $ Config.buildPath (Config.general config)
+      phlogDirectory = phlogPath phlogConfig
+      feedRelativePath = phlogDirectory </> "tags" </> (T.unpack tag <.> "xml")
+      outputPath = outputDirectory </> feedRelativePath
+      metas = phlogIndex
+      -- FIXME
+      atomFeed = (createAtomFeed $ AtomFeedRecipe (T.pack $ (T.unpack tag) ++ " tag phlog feed") metas phlogConfig feedRelativePath)
     createDirectoryIfMissing True (takeDirectory outputPath)
     XML.writeFile def outputPath atomFeed
 
@@ -456,7 +470,7 @@ associated `FrontMatter` (if any), which contains the tags for that file.
 
 The tags are written out to the supplied `FilePath`.
 -}
-renderTagIndexes :: ConfigParser -> [FileFrontMatter] -> IO ()
+renderTagIndexes :: Config.Config -> [FileFrontMatter] -> IO ()
 renderTagIndexes config filePathFrontMatter = do
   let postMetaList = preparePostsOnlyFromPairs filePathFrontMatter
       -- FIXME/TODO: I filter out no tags instead of putting into [] group?

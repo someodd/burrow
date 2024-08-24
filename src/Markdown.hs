@@ -40,6 +40,9 @@ import TextUtils (italicize, embolden)
 
 
 -- | Stuff to make available to the parser.
+--
+-- I'm thinking over if this is required or if I can just use Config or a Recipe. Seems
+-- redundant. If anything could be called MarkdownRecipe or MarkdownStyles or something.
 data Environment =
   Environment
     { envFonts :: HeadingLevelFontMap

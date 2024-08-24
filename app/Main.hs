@@ -5,10 +5,12 @@ import Build
 import Options.Applicative hiding (ParseError)
 import Paths_burrow (version)
 import Data.Version (showVersion)
-import SpacecookieClone.Serve (runServer)
+import SpacecookieClone.Serve (runServerWithConfig)
 import System.FSNotify
 import Control.Concurrent (threadDelay)
 import Control.Monad (forever)
+import qualified Config
+import qualified Data.Text as T
 
 parserPrefs :: ParserPrefs
 parserPrefs = defaultPrefs
@@ -73,15 +75,19 @@ main = do
       if watch
         then do
           putStrLn "Watching for changes in burrowsrc..."
+          config <- Config.getConfig spacecookiePath
+          let directoryPathToWatch = T.unpack $ Config.sourcePath (Config.general config)
           withManager $ \mgr -> do
             _ <- watchDir
               mgr
-              "burrowsrc"
+              directoryPathToWatch
               (const True)
               (\_ -> do
                   putStrLn "Change detected, rebuilding..."
                   buildGopherhole (Just spacecookiePath) True
                   putStrLn "Rebuild complete.")
-            runServer spacecookiePath
+            runServerWithConfig (Config.spacecookie config)
             forever $ threadDelay 1000000
-        else runServer spacecookiePath
+        else do
+          config <- Config.getConfig spacecookiePath
+          runServerWithConfig (Config.spacecookie config)

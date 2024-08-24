@@ -62,9 +62,9 @@ type SourceFile = (FilePath, BuildJobType)
 -- NOTE: when I say "skip" here I mean not using a RenderEngine.
 -- | Get a list of source files' file paths to be used in order to construct
 -- the gopherhole, as well as the type of parser to use to render those paths.
-getSourceFiles :: ConfigParser -> FilePath -> IO [SourceFile]
+getSourceFiles :: Config -> FilePath -> IO [SourceFile]
 getSourceFiles config sourceDirectory = do
-  dontSkipThese <- fmap words $ getConfigValue config "general" "buildExtensions"
+  let dontSkipThese = (words . T.unpack) $ buildExtensions (general config)  -- FIXME: shouldn't buildExtensions already be list?
   filesMatching <- getDirectoryFiles sourceDirectory ["**" </> "*"]
   pure $ fmap (\x -> (x, getBuildJobType dontSkipThese x)) filesMatching
  where
@@ -80,7 +80,7 @@ getSourceFiles config sourceDirectory = do
 
 -- FIXME: this may result in the file being read twice.
 -- | Create a `FileRenderRecipe` for rendering a file. Gets a file ready for being built.
-createRenderRecipe :: ConfigParser -> FilePath -> FilePath -> Bool -> FilePath -> ContentType -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
+createRenderRecipe :: Config -> FilePath -> FilePath -> Bool -> FilePath -> ContentType -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
 -- contentType argument should be renamed to defaultContentType FIXME
 createRenderRecipe config sourceDirectory destinationDirectory spaceCookie filePath contentType = do
   outPath <- finalFilePath
@@ -88,7 +88,7 @@ createRenderRecipe config sourceDirectory destinationDirectory spaceCookie fileP
         { frrSourceDirectory = sourceDirectory
         , frrDestinationDirectory = destinationDirectory
         , frrSpacecookie = spaceCookie
-        , frrTemplateToRender = sourcePath
+        , frrTemplateToRender = sourcePath'
         , frrContentType = contentType
         , frrOutPath = outPath
         , frrBucktooth = takeFileName outPath == ".gophermap"
@@ -98,13 +98,13 @@ createRenderRecipe config sourceDirectory destinationDirectory spaceCookie fileP
         , frrSkipMarkdown = False
         }
 
-  fileText <- TIO.readFile sourcePath
+  fileText <- TIO.readFile sourcePath'
   let (frontMatter, restOfDocument) = getFrontMatter filePath fileText
       templateToUse = frontMatter >>= fmParentTemplate
       renderAs = case frontMatter >>= fmRenderAs of
                    Just contentTypeOverride -> contentTypeOverride
                    Nothing -> contentType
-  variablePairs <- traverse (toVariablePairs config) frontMatter
+  let variablePairs = toVariablePairs config <$> frontMatter
   let recipeFrontMatterChanges = defaultRecipe
         { frrSubstitutions = dataForMustacheWithFrontmatter frontMatter variablePairs
         , frrContentType = renderAs
@@ -122,8 +122,8 @@ createRenderRecipe config sourceDirectory destinationDirectory spaceCookie fileP
           recipe = recipeFrontMatterChanges { frrIncludePartial = Just partial'sTemplatePath, frrSubstitutions = newDataForMustache }
       in pure (recipe, frontMatterReturnPair frontMatter)
  where
-  sourcePath :: FilePath
-  sourcePath = sourceDirectory </> filePath
+  sourcePath' :: FilePath
+  sourcePath' = sourceDirectory </> filePath
 
   outputPath :: FilePath
   outputPath = destinationDirectory </> filePath
@@ -137,15 +137,15 @@ createRenderRecipe config sourceDirectory destinationDirectory spaceCookie fileP
   -- | Some magic for choosing the target path to write to for the file being
   -- parsed. This is because of the .gopherpath/directory index behavior.
   finalFilePath :: IO FilePath
-  finalFilePath = do
-    indexName <- getConfigValue config "general" "directoryMapName"
-    if spaceCookie && indexName `isSuffixOf` filePath
+  finalFilePath =
+    let indexName = T.unpack $ directoryMapName $ general config
+    in if spaceCookie && indexName `isSuffixOf` filePath
       then let x = (takeDirectory $ outputPath) in pure $ x </> ".gophermap"
       else pure outputPath
 
 
 -- FIXME: note that "Skip" means to skip the render process and just copy the file.
-buildFile :: ConfigParser -> FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
+buildFile :: Config -> FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
 buildFile _ sourceDirectory destinationDirectory _ sourceFile@(filePath, SimplyCopy) = do
   -- Don't parse; just copy the file to the target directory.
   let destination = destinationDirectory </> filePath
@@ -248,16 +248,17 @@ parseMustache mainText recipe = do
     mainTemplate <- automaticCompileText mainText
     pure mainTemplate
 
-envFromConfig :: ConfigParser -> IO Environment
+envFromConfig :: Config -> IO Environment
 envFromConfig config = do
-  allTheAsciiFonts <- getAsciiFonts config
-  host <- T.pack <$> getConfigValue config "general" "host"
-  port <- T.pack <$> getConfigValue config "general" "port"
-  asciiSafe <- getConfigValuePolymorphic config "general" "asciiSafe"
-  pure Environment { envFonts = allTheAsciiFonts, envMenuLinks = Just (host, port), envPreserveLineBreaks = True, envBucktooth = False, envAsciiSafe = asciiSafe }
+  allTheAsciiFonts <- getAsciiFonts (fonts config)
+  let
+    host' = host (general config)
+    port' = T.pack . show $ port (general config)
+    asciiSafe' = asciiSafe (general config)
+  pure $ Environment { envFonts = allTheAsciiFonts, envMenuLinks = Just (host', port'), envPreserveLineBreaks = True, envBucktooth = False, envAsciiSafe = asciiSafe' }
 
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
-parseMarkdown :: ConfigParser -> Bool -> ContentType -> T.Text -> IO T.Text
+parseMarkdown :: Config -> Bool -> ContentType -> T.Text -> IO T.Text
 parseMarkdown config _ GopherFileType contents = do
   out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherPage))
   case out of
@@ -287,8 +288,9 @@ parseMarkdown config bucktooth GopherMenuType contents = do
 buildGopherhole :: Maybe FilePath -> Bool -> IO ()
 buildGopherhole maybeConfigPath spaceCookie = do
   config <- getConfig $ fromMaybe burrowGopherholeDefaultConfigPath maybeConfigPath
-  sourceDir <- getConfigValue config "general" "sourcePath"
-  destDir <- getConfigValue config "general" "buildPath"
+  let
+    sourceDir = T.unpack $ sourcePath $ general config
+    destDir = T.unpack $ buildPath $ general config
   sourceFiles <- getSourceFiles config sourceDir :: IO [SourceFile]
   filePathFrontMatter <- traverse (buildFile config sourceDir destDir spaceCookie) sourceFiles
   renderTagIndexes config filePathFrontMatter

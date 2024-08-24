@@ -17,8 +17,7 @@ import Network.Gopher.Util.Gophermap
 import qualified Data.ByteString as B
 import Control.Applicative ((<|>))
 import Control.Exception (catches, Handler (..))
-import Control.Monad (when, unless)
-import Data.Aeson (eitherDecodeFileStrict')
+import Control.Monad (when)
 import Data.Attoparsec.ByteString (parseOnly)
 import Data.Bifunctor (first)
 import Data.ByteString.Builder (Builder ())
@@ -32,46 +31,62 @@ import System.FilePath.Posix.ByteString ( RawFilePath, takeFileName, (</>)
 import qualified System.Log.FastLogger as FL
 import System.Posix.Directory (changeWorkingDirectory)
 import System.Socket (SocketException ())
+import qualified Config
+import SpacecookieClone.Config as SpaceConfig
+import Data.Text.Encoding (encodeUtf8)
+import qualified Data.Text as T
 
-runServer :: FilePath -> IO ()
-runServer configFile = do
-  doesFileExist configFile >>=
-    (flip unless) (die "could not open config file")
-  config' <- eitherDecodeFileStrict' configFile
-  case config' of
-    Left err -> die $ "failed to parse config: " ++ err
-    Right config -> do
-      changeWorkingDirectory (rootDirectory config)
-      (logHandler, logStopAction) <- fromMaybe (Nothing, pure ())
-        . fmap (first Just) <$> makeLogHandler (logConfig config)
-      let cfg = GopherConfig
-            { cServerName = serverName config
-            , cListenAddr = listenAddr config
-            , cServerPort = serverPort config
-            , cLogHandler = logHandler
-            }
-          logIO = fromMaybe noLog logHandler
 
-      let setupFailureHandler e = do
-            logIO GopherLogLevelError
-              $  "Exception occurred in setup step: "
-              <> toGopherLogStr (show e)
-            logStopAction
-            exitFailure
-          catchSetupFailure a = a `catches`
-            [ Handler (setupFailureHandler :: SystemdException -> IO ())
-            , Handler (setupFailureHandler :: SocketException -> IO ())
-            ]
+burrowConfigToConfig :: Config.SpacecookieConfig -> SpaceConfig.Config
+burrowConfigToConfig spacecookieConfig =
+  SpaceConfig.Config
+    { serverName = encodeUtf8 $ Config.hostname spacecookieConfig
+    , runUserName = T.unpack <$> Config.user spacecookieConfig
+    , rootDirectory = T.unpack $ Config.root spacecookieConfig
+    , listenAddr = Just $ encodeUtf8 $ Config.listenAddr spacecookieConfig
+    , serverPort = fromIntegral $ Config.listenPort spacecookieConfig
+    , logConfig = SpacecookieClone.Config.LogConfig
+        { logEnable = True
+        , logLevel = GopherLogLevelInfo
+        , logHideTime = False
+        , logHideIps = False
+        }
+    }
 
-      catchSetupFailure $ runGopherManual
-        (systemdSocket cfg)
-        (afterSocketSetup logIO config)
-        (\s -> do
-          _ <- notifyStopping
-          logStopAction
-          systemdStoreOrClose s)
-        cfg
-        (spacecookie logIO)
+runServerWithConfig :: Config.SpacecookieConfig -> IO ()
+runServerWithConfig burrowConfig = do
+  let config = burrowConfigToConfig burrowConfig
+  changeWorkingDirectory (rootDirectory config)
+  (logHandler, logStopAction) <- fromMaybe (Nothing, pure ())
+    . fmap (first Just) <$> makeLogHandler (logConfig config)
+  let cfg = GopherConfig
+        { cServerName = serverName config
+        , cListenAddr = listenAddr config
+        , cServerPort = serverPort config
+        , cLogHandler = logHandler
+        }
+      logIO = fromMaybe noLog logHandler
+
+  let setupFailureHandler e = do
+        logIO GopherLogLevelError
+          $  "Exception occurred in setup step: "
+          <> toGopherLogStr (show e)
+        logStopAction
+        exitFailure
+      catchSetupFailure a = a `catches`
+        [ Handler (setupFailureHandler :: SystemdException -> IO ())
+        , Handler (setupFailureHandler :: SocketException -> IO ())
+        ]
+
+  catchSetupFailure $ runGopherManual
+    (systemdSocket cfg)
+    (afterSocketSetup logIO config)
+    (\s -> do
+      _ <- notifyStopping
+      logStopAction
+      systemdStoreOrClose s)
+    cfg
+    (spacecookie logIO)
 
 afterSocketSetup :: GopherLogHandler -> Config -> IO ()
 afterSocketSetup logIO cfg = do

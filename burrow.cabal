@@ -81,6 +81,7 @@ library
     , table-layout ==0.9.1.0
     , text
     , time
+    , tomland
     , unix
     , unordered-containers
     , vector
@@ -137,6 +138,7 @@ executable burrow
     , table-layout ==0.9.1.0
     , text
     , time
+    , tomland
     , unix
     , unordered-containers
     , vector
