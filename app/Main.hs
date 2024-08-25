@@ -100,10 +100,10 @@ main = do
   opts <- customExecParser parserPrefs mainParser
   case subcommand opts of
     Build buildSpacecookieFlag maybeConfigPath -> do
-      (config, _, _) <- Config.getConfigSpecial maybeConfigPath
+      (config, _, _) <- Config.getConfigSpecial maybeConfigPath True
       buildGopherhole config buildSpacecookieFlag
     Serve maybeConfigPath watch -> do
-      (config, absConfigPath, projectRoot) <- Config.getConfigSpecial maybeConfigPath
+      (config, absConfigPath, projectRoot) <- Config.getConfigSpecial maybeConfigPath True
       if watch
         then watchServe absConfigPath projectRoot config
         else runServerWithConfig (Config.spacecookie config)

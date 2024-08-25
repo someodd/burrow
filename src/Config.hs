@@ -30,7 +30,7 @@ burrowGopherholeDefaultConfigPath :: FilePath
 burrowGopherholeDefaultConfigPath = "data/burrow.toml"
 
 {- | Get the config file from path and also specify the "project root" as
-something relative to the config file.
+something relative to the config file or the current working directory.
 
 The config file resides in a directory called data/ in the project root.
 
@@ -38,16 +38,24 @@ The config file resides in a directory called data/ in the project root.
 getConfigSpecial
   :: Maybe FilePath
   -- ^ path to the data/burrow.toml file
+  -> Bool
+  -- ^ Project root is the current working directory?
   -> IO (Config.Config, FilePath, FilePath)
   -- ^ (the config, path to config, project root) -- absolute paths.
-getConfigSpecial maybeConfigPath = do
+getConfigSpecial maybeConfigPath cwdProjectRoot = do
   absConfigPath <- maybe (return Config.burrowGopherholeDefaultConfigPath) canonicalizePath maybeConfigPath
 
-  case ensureInDataDir absConfigPath of
-    Nothing -> error $ "Config file must be in a directory named data/, but got: " ++ absConfigPath
-    Just projectRoot -> do
+  if cwdProjectRoot
+    then do
+      projectRoot <- canonicalizePath "."
       config <- Config.getConfig absConfigPath
       pure (config, absConfigPath, projectRoot)
+    else
+      case ensureInDataDir absConfigPath of
+        Nothing -> error $ "Config file must be in a directory named data/, but got: " ++ absConfigPath
+        Just projectRoot -> do
+          config <- Config.getConfig absConfigPath
+          pure (config, absConfigPath, projectRoot)
 
 -- FIXME
 {- | Ensure the file is inside a "data/" directory and get the parent directory of "data/"
