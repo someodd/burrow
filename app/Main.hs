@@ -87,7 +87,7 @@ watchServe configFilePath projectRootPath config = do
           changeWorkingDirectory projectRootPath
           currentConfigState <- Config.getConfig configFilePath
           putStrLn "Got current config state, starting build..."
-          buildGopherhole currentConfigState True
+          buildGopherhole projectRootPath currentConfigState True
           putStrLn "Rebuild complete.")
     
     -- Keep the watcher alive
@@ -100,10 +100,10 @@ main = do
   opts <- customExecParser parserPrefs mainParser
   case subcommand opts of
     Build buildSpacecookieFlag maybeConfigPath -> do
-      (config, _, _) <- Config.getConfigSpecial maybeConfigPath True
-      buildGopherhole config buildSpacecookieFlag
+      (config, _, projectRootPath) <- Config.getConfigSpecial maybeConfigPath False
+      buildGopherhole projectRootPath config buildSpacecookieFlag
     Serve maybeConfigPath watch -> do
-      (config, absConfigPath, projectRoot) <- Config.getConfigSpecial maybeConfigPath True
+      (config, absConfigPath, projectRoot) <- Config.getConfigSpecial maybeConfigPath False
       if watch
         then watchServe absConfigPath projectRoot config
         else runServerWithConfig (Config.spacecookie config)

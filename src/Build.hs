@@ -44,6 +44,10 @@ import Markdown
 import Mustache
 
 
+-- | Relative to a project root, the directory name containing the source to build.
+defaultSourceDirectoryName :: FilePath
+defaultSourceDirectoryName = "burrowsrc"
+
 -- | The content type in gopherspace as far as the renderer is concerned. This
 -- helps inform the file's build process, like which Markdown parser (if any)
 -- to use by default, or if the file should only be copied.
@@ -285,10 +289,10 @@ parseMarkdown config bucktooth GopherMenuType contents = do
 --
 -- If you do not specify a configuration file path, the default configuration file path is
 -- used.
-buildGopherhole :: Config -> Bool -> IO ()
-buildGopherhole config spaceCookie = do
+buildGopherhole :: FilePath -> Config -> Bool -> IO ()
+buildGopherhole projectRootPath config spaceCookie = do
   let
-    sourceDir = T.unpack $ sourcePath $ general config
+    sourceDir = projectRootPath </> defaultSourceDirectoryName
     destDir = T.unpack $ buildPath $ general config
   sourceFiles <- getSourceFiles config sourceDir :: IO [SourceFile]
   filePathFrontMatter <- traverse (buildFile config sourceDir destDir spaceCookie) sourceFiles
