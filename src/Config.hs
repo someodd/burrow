@@ -21,10 +21,20 @@ module Config where
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Toml
+import System.Directory (canonicalizePath)
 
 -- | The name of the config file a gopherhole uses...
 burrowGopherholeDefaultConfigPath :: FilePath
-burrowGopherholeDefaultConfigPath = "data/gopherhole.ini"
+burrowGopherholeDefaultConfigPath = "data/burrow.toml"
+
+{- | Return the config, along with the absolute path it was loaded from.
+
+-}
+getConfigOrDefault :: Maybe FilePath -> IO (Config, FilePath)
+getConfigOrDefault maybeConfigPath = do
+  filePath <- maybe (return burrowGopherholeDefaultConfigPath) canonicalizePath maybeConfigPath
+  config <- getConfig filePath
+  pure (config, filePath)
 
 data FontsConfig = FontsConfig
   { h1 :: Text

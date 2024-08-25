@@ -13,12 +13,14 @@ Good deal of under-the-hood config tweaking.
 
 * `--config` file to specify the config to use
 * `--watch` to rebuild when changes detected and also serve output
+* Implicit constraint that the defining config must be located like `$PROJECTROOT/data/something.toml`
 
 ### Changed
 
 * Now using TOML config format
 * `spacecookie.json` now integrated into `gopherhole.ini` (`spacecookie.json` is no longer required)
 * `gopherhole.ini` basically renamed to `burrow.toml`
+* The CLI--just check it out...
 
 ## [0.5.0.0] - 2024-08-14
 

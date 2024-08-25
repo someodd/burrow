@@ -285,9 +285,8 @@ parseMarkdown config bucktooth GopherMenuType contents = do
 --
 -- If you do not specify a configuration file path, the default configuration file path is
 -- used.
-buildGopherhole :: Maybe FilePath -> Bool -> IO ()
-buildGopherhole maybeConfigPath spaceCookie = do
-  config <- getConfig $ fromMaybe burrowGopherholeDefaultConfigPath maybeConfigPath
+buildGopherhole :: Config -> Bool -> IO ()
+buildGopherhole config spaceCookie = do
   let
     sourceDir = T.unpack $ sourcePath $ general config
     destDir = T.unpack $ buildPath $ general config
