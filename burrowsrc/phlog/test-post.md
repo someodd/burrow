@@ -7,4 +7,4 @@ type: post
 parentTemplate: post.txt
 ----
 
-A test post
+A test post.

@@ -22,10 +22,48 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Toml
 import System.Directory (canonicalizePath)
+import System.FilePath (splitPath, joinPath)
+import Data.List (findIndex, isSuffixOf)
 
 -- | The name of the config file a gopherhole uses...
 burrowGopherholeDefaultConfigPath :: FilePath
 burrowGopherholeDefaultConfigPath = "data/burrow.toml"
+
+{- | Get the config file from path and also specify the "project root" as
+something relative to the config file.
+
+The config file resides in a directory called data/ in the project root.
+
+-}
+getConfigSpecial
+  :: Maybe FilePath
+  -- ^ path to the data/burrow.toml file
+  -> IO (Config.Config, FilePath, FilePath)
+  -- ^ (the config, path to config, project root) -- absolute paths.
+getConfigSpecial maybeConfigPath = do
+  absConfigPath <- maybe (return Config.burrowGopherholeDefaultConfigPath) canonicalizePath maybeConfigPath
+
+  case ensureInDataDir absConfigPath of
+    Nothing -> error $ "Config file must be in a directory named data/, but got: " ++ absConfigPath
+    Just projectRoot -> do
+      config <- Config.getConfig absConfigPath
+      pure (config, absConfigPath, projectRoot)
+
+-- FIXME
+{- | Ensure the file is inside a "data/" directory and get the parent directory of "data/"
+
+>>> ensureInDataDir "data/burrow.toml"
+Just ""
+>>> ensureInDataDir "/wow/data/burrow.toml"
+Just "/wow/"
+-}
+ensureInDataDir :: FilePath -> Maybe FilePath
+ensureInDataDir filePath =
+  let pathParts = splitPath filePath
+      dataIndex = findIndex ("data/" `isSuffixOf`) pathParts
+  in case dataIndex of
+       Just idx -> Just (joinPath $ take idx pathParts)
+       Nothing -> Nothing
 
 {- | Return the config, along with the absolute path it was loaded from.
 
