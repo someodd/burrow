@@ -4,7 +4,7 @@ MAINTAINER someodd, https://github.com/someodd
 RUN apt-get update
 RUN apt-get install -y git
 RUN useradd spacecookie
-ADD spacecookie.json /etc/spacecookie.json
+ADD burrow.toml /etc/burrow.toml
 RUN mkdir -p /srv/gopher
 
 # FIXME: if i don't do this hgetfilecontents or whatever will fail

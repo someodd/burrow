@@ -105,7 +105,6 @@ phlogConfigCodec = Toml.genericCodec
 
 data GeneralConfig = GeneralConfig
   { buildPath :: Text
-  , sourcePath :: Text
   , host :: Text
   , port :: Int
   , buildExtensions :: Text  -- FIXME: list!

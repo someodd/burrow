@@ -13,6 +13,7 @@
 -}
 module Build 
   ( buildGopherhole
+  , defaultSourceDirectoryName
   ) 
 where
 

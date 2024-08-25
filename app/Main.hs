@@ -11,8 +11,7 @@ import Control.Concurrent (threadDelay)
 import Control.Monad (forever)
 import qualified Config
 import System.Posix (changeWorkingDirectory)
-import qualified Data.Text as T
-import System.Directory (canonicalizePath)
+import System.FilePath ((</>))
 
 parserPrefs :: ParserPrefs
 parserPrefs = defaultPrefs
@@ -72,7 +71,7 @@ then rebuild the gopherhole.
 watchServe :: FilePath -> FilePath -> Config.Config -> IO ()
 watchServe configFilePath projectRootPath config = do
   putStrLn "Starting the server..."
-  sourceDirectoryPath <- canonicalizePath $ T.unpack $ Config.sourcePath (Config.general config)
+  let sourceDirectoryPath = projectRootPath </> defaultSourceDirectoryName
 
   putStrLn $ "Watching for changes in burrowsrc: " ++ sourceDirectoryPath
   
