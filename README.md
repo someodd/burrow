@@ -110,6 +110,8 @@ For an actual production server and even for local testing you may want to check
 project's Docker configuration in `docker/`, there's a `README.md` to help you get
 started. It has some neat devops-type features.
 
+You can download a binary from the releases page.
+
 ## Some features
 
 * Parse markdown, using commonmark
