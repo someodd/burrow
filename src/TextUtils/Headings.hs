@@ -25,6 +25,7 @@ import Config
 import Data.Maybe (listToMaybe, catMaybes, isJust)
 import Data.Foldable (traverse_)
 import Data.Text (unpack)
+import System.FilePath ((</>))
 
 
 -- | An ASCII art character is represented by breaking up each line into an element of a list.
@@ -41,9 +42,9 @@ type AsciiFont = Map.Map Char AsciiChar
 -- The character width and height is determined from the first entry.
 --
 -- See the project's README for the font spec.
-parseFont :: FilePath -> IO AsciiFont
-parseFont path = do
-  fontFileContents <- readFile path
+parseFont :: FilePath -> FilePath -> IO AsciiFont
+parseFont projectRoot fontName = do
+  fontFileContents <- readFile (projectRoot </> relativeFontsPath </> fontName)
   let
     charPairs = map charLegendsToPair (splitIntoCharLegends fontFileContents)
     (width, height) = case charPairs of
@@ -59,7 +60,7 @@ parseFont path = do
   -- display any warnings for this font
   if any isJust warnings
     then do
-      putStrLn $ "Warnings encountered while parsing font file: " ++ path ++ "."
+      putStrLn $ "Warnings encountered while parsing font file: " ++ fontName ++ "."
       traverse_ putStrLn (catMaybes warnings)
     else
       pure ()
@@ -120,13 +121,16 @@ validateCharacter width height characterTitle asciiChar = do
 -- | Specifies which AsciiFont is related to which heading level.
 type HeadingLevelFontMap = Map.Map Int AsciiFont
 
+-- | The default path to fonts, relative to the project root.
+relativeFontsPath :: FilePath
+relativeFontsPath = "data/fonts/"
 
 -- FIXME: if defined more than once, will load in the same fonts over and over!
 -- | Get all the fonts loaded, mapped to a specific heading level,
 -- according to the configuration file.
-getAsciiFonts :: FontsConfig -> IO HeadingLevelFontMap
-getAsciiFonts fontsConfig = do
-  let func level = pure (getFontByLevel level) >>= parseFont >>= pure . (,) level
+getAsciiFonts :: FilePath -> FontsConfig -> IO HeadingLevelFontMap
+getAsciiFonts projectRoot fontsConfig = do
+  let func level = pure (getFontByLevel level) >>= parseFont projectRoot >>= pure . (,) level
   result <- traverse func [1..6]
   pure $ Map.fromList result
  where

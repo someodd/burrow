@@ -1,8 +1,7 @@
 -- | Stuff for managing Mustache templates.
 {-# LANGUAGE OverloadedStrings          #-}
 module Mustache
-  ( searchSpace
-  , getCompiledTemplate
+  ( getCompiledTemplate
   , dataForMustache
   , automaticCompileText
   ) where
@@ -17,11 +16,12 @@ import Text.Mustache.Parser
 import qualified Text.Mustache.Types as Mtype
 
 import TextUtils
+import System.FilePath ((</>))
 
-
+-- FIXME: will get removed
 -- | This is where Mustache will look for files, especially for partials.
-searchSpace :: [FilePath]
-searchSpace = ["./templates", "."]
+--searchSpace :: [FilePath]
+--searchSpace = ["./templates", "."]
 
 
 -- | This is like `automaticCompile`, except we use `Text`.
@@ -35,13 +35,14 @@ searchSpace = ["./templates", "."]
 --  , partials :: TemplateCache
 --
 --  Used for the main document parsing, I guess?
-automaticCompileText :: T.Text -> IO Template
-automaticCompileText templateToRenderText = do
+automaticCompileText :: FilePath -> T.Text -> IO Template
+automaticCompileText projectRoot templateToRenderText = do
   template <- compileTemplate'
   let [t] = template
   pure t
  where
   compileTemplate' = do
+    let searchSpace = [projectRoot </> "templates", projectRoot]
     let mainPartialAST =
           case parse "partial" templateToRenderText of
             Left err -> error $ show err

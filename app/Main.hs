@@ -12,6 +12,7 @@ import Control.Monad (forever)
 import qualified Config
 import System.Posix (changeWorkingDirectory)
 import System.FilePath ((</>))
+import Control.Exception (SomeException, try)
 
 parserPrefs :: ParserPrefs
 parserPrefs = defaultPrefs
@@ -83,12 +84,14 @@ watchServe configFilePath projectRootPath config = do
       (const True) -- Watch all changes
       (\_ -> do
           putStrLn "Change detected, about to rebuild..."
-          changeWorkingDirectory projectRootPath
-          currentConfigState <- Config.getConfig configFilePath
+          --changeWorkingDirectory projectRootPath
+          -- FIXME: enable above and fix config below... should have standard...
+          (currentConfigState, _, _) <- Config.getConfigSpecial (Just configFilePath) False
           putStrLn "Got current config state, starting build..."
-          buildGopherhole projectRootPath currentConfigState True
-          putStrLn "Rebuild complete.")
-    
+          result <- try (buildGopherhole projectRootPath currentConfigState True) :: IO (Either SomeException ())
+          case result of
+            Left ex -> putStrLn $ "Rebuild failed with error: " ++ show ex
+            Right _ -> putStrLn "Rebuild complete.")
     -- Keep the watcher alive
     changeWorkingDirectory projectRootPath
     runServerWithConfig (Config.spacecookie config)

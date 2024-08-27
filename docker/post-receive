@@ -1,6 +1,7 @@
 #!/bin/sh
 rm -rf /tmp/gopherhole-clone
 git clone /srv/git/gopherhole.git /tmp/gopherhole-clone
+# could cd here
 burrow build --config /tmp/gopherhole-clone/data/burrow.toml
 pkill burrow
 nohup burrow serve --config /tmp/gopherhole-clone/data/burrow.toml > /dev/null 2>&1 &

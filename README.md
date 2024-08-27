@@ -8,27 +8,118 @@ I made my gopherhole with burrow, so it's an example:
 
   * gopher://gopher.someodd.zip:7071/
   * https://github.com/someodd/personal-gopherhole
-  * This functional example uses this repo's Docker config, allow me to push to the above repo, and the repo that is used to build my gopherhole (Docker setup is a git + gopher server)
+  * This functional example uses this repo's Docker config, allow me to push to the above
+    repo, and the repo that is used to build my gopherhole (Docker setup is a git + gopher
+    server)
 
 There's a `.deb` (Ubuntu, Debian) available in the releases.
 
 Written in Haskell. If you're looking for very similar software, with coincidentally the exact same name, please check out [James Tomasino's Burrow](https://github.com/jamestomasino/burrow).
 
+## Conceptual
+
+You should know these terms:
+
+* gopherhole
+* gopherhole project
+* gophermap/menu
+* gopherspace
+
+### gopherhole project overview
+
+A "gopherhole project" is simply a directory that looks like this:
+
+```
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃ ⚘ PROJECT ROOT ⚘                              ┃
+┃ ┣━━ 📂 data/                                  ┃
+┃ ┃   ┣━━ 📂 fonts/  [BMF fonts]                ┃
+┃ ┃   ┗━━ 📜 burrow.toml  [Main config]         ┃
+┃ ┣━━ 📂 burrowsrc/  [Gopherhole content]       ┃
+┃ ┗━━ 📂 templates/  [Reusable document bits]   ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+```
+
+Note that you can turn this gopherhole project into a git repo... work with Docker...
+
+The software *does* change directory to the project root and assume project root as the
+path that some things are relative to. By default the project root is assumed to be the
+directory containing `data/burrow.toml` (like when you point to it with `--config`).
+
+All of this "compiles" to a specified output directory, to be served via the Gopher
+Protocol.
+
+### `data/burrow.toml`
+
+Perhaps the most important file to look over and change yourself. Rules for building the
+gopherhole project, but also for serving a gopherhole.
+
+Any relative paths are assumed to be relative to the project root.
+
+### `data/fonts/`
+
+ASCII art fonts in `.bmf` format (Burrow M [I forgot] Font). These are currently used when
+rendering headers from Markdown files, but I imagine soon I'll make a function so you can
+arbitrarily make ASCII art text.
+
+`.bmf` font spec is simple: on one line is a character you wish to represent, followed by the
+ASCII art for the character. Each line for the character must be of the same length. Each
+character in the font must be of the same number of lines. Separate character definitions
+with blank lines (`\n\n`).
+
+### `templates/`
+
+Re-usable document bits. You can use these bits like macros, to:
+
+  * jam some file you wrote *inside* of a template
+  * include some template into a file you wrote
+
+You can call upon templates using Frontmatter, but also Moustache.
+
+### `burrowsrc/`
+
+All the files to be served from your gopherhole, which burrow will either parse or copy.
+Use whatever directory structure in there.
+
+The rules for parsing a regular text or Markdown file in a gopherholeproject, into either (for gopherspace) a regular text file or a gophermap/menu, are configured like so:
+
+* In `burrow.toml`
+* In the file's Frontmatter: this *should* override everythinge else
+* The file's extension
+
+You may want to read the section(s) on Frontmatter and templating for these files as well
+and reading `burrow.toml`.
+
 ## Quick Start
 
-There's an example gopherhole (in `burrowsrc/`, with a default config in
-`data/gopherhole.ini`) you can build with these command and then visit `localhost:7070` in
-`gopher`:
+This repo contains an example gopherhole project, run this command and then visit
+`localhost:7070` in `gopher` (make sure `gopher` is installed):
 
 ```
-burrow build --spacecookie
-cd built
-spacecookie ../data/spacecookie.json
+burrow serve --config data/burrow.toml --watch
+gopher -p "/" localhost 7070
 ```
 
-The `--spacecookie` flag parses `index.menu.md` files to `.gophermap` files, I think?
+Try editing the files in `burrowsrc/` and revisiting the gopherhoole.
 
-## Features
+There are many different Gopher Protocol clients, my favorite GUI client is
+[Lagrange](https://gmi.skyjake.fi/lagrange/) (Linux, Mac, iOS, Android, more?)--try using
+it to visit [gopher://localhost:7070/](gopher://localhost:7070/).
+
+For an actual production server and even for local testing you may want to check this
+project's Docker configuration in `docker/`, there's a `README.md` to help you get
+started. It has some neat devops-type features.
+
+## Some features
+
+* Parse markdown, using commonmark
+* Config-based parser, server, and other behavior: `burrow.toml`
+* Front matter
+* Mustache templating with extended features
+* Blogging/phlogging
+* ASCII-art font system
+* `.gophermap` support, also this is a `--spacecookie` and burrow setting (which files to
+  make into the main menu for the directory, similar to `index.html` for web)
 
 ### Front matter
 
@@ -54,17 +145,19 @@ Here's the content of my post that supports Markdown and Mustache.
 
 ### Mustache
 
-Use [Mustache](https://mustache.github.io/) for templating.
+Use [Mustache](https://mustache.github.io/) for templating. In addition to simple
+templating, it also comes pre-loaded with some functions for ASCII-art-ifying files.
 
 There are built in lambdas for your convenience:
 
   * `{{#columnate2}}this text will be justified and broken up like a newspaper{{/columnate2}}`
+  * `{{#justify}}this text will be justified{{/justify}}`
+  * `{{#justify2}}this text will be justified using a different algorith, I think{{/justify2}}`
 
-### Markdown
+I imagine more is to come and hopefully even more beautiful ASCII art can be had. I
+encourage people, here most of all, to make open source contributions.
 
-Commonmark parser is used.
-
-### Phlogging features
+### Blogging (phlogging) features
 
 Indexes will be generated as gophermaps for posts which are tagged and have all
 the required front matter (like `published`, `title`, and `type: post`).
@@ -72,16 +165,13 @@ the required front matter (like `published`, `title`, and `type: post`).
 Atom feeds will be generated for each index (tag indexes, the main feed, and
 tag summaries).
 
-### Change a lot of the behavior through an INI
-
-Be sure to look at `data/gopherhole.ini` in order to control and customize the builder!
-
 ## Other notes
 
 This software has primarily been tested with
-[spacecookie](https://github.com/sternenseemann/spacecookie) (Gopher server).
-You may want to look at [my spacecookie Docker
-repo](https://github.com/someodd/docker-spacecookie). Currently, Burrow relies heavily on the `.gophermap` behavior outlined in these documents:
+[spacecookie](https://github.com/sternenseemann/spacecookie) (Gopher server). Although now
+techically using an integrated fork of that software in Burrow.  You may want to look at
+[my spacecookie Docker repo](https://github.com/someodd/docker-spacecookie). Currently,
+Burrow relies heavily on the `.gophermap` behavior outlined in these documents:
 
 * [spacecookie.gophermap(5)](https://sternenseemann.github.io/spacecookie/spacecookie.json.5.html)
 * [Bucktooth's gophermap tutorial](http://gopher.floodgap.com/gopher/gw.lite?=gopher.floodgap.com+70+302f6275636b2f6462726f7773653f666171757365203161)
@@ -95,18 +185,7 @@ Other good things to read about and know:
 * [CommonMark](https://commonmark.org/): a great Markdown standard (used by GitHub, Reddit, Stack Overflow)
 * You should know about [the Gopher protocol](https://en.wikipedia.org/wiki/Gopher_%28protocol%29)
 
-### Font system
-
-The font system is primarily used by the markdown parser for headings.
-
-Headings are parsed in a way which creates fancy ASCII art headings. You can specify which ASCII art
-font to use in `data/gopherhole.ini`.
-
-The font spec is simple: on one line is a character you wish to represent, followed by the ASCII art for the character. Each line for the character must be of the same length. Each character in the font must be of the same number of lines. Separate character definitions with blank lines.
-
-For more info please see `data/fonts/`.
-
-## Example
+## Big parsing example
 
 Turn this:
 

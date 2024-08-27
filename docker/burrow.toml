@@ -2,12 +2,12 @@
 
 # The ASCII art font files used for each heading level.
 [fonts]
-h1="data/fonts/figlet_graceful.bmf"
-h2="data/fonts/simple_octo.bmf"
-h3="data/fonts/simple_underline.bmf"
-h4="data/fonts/simplest.bmf"
-h5="data/fonts/simplest.bmf"
-h6="data/fonts/simplest.bmf"
+h1="figlet_graceful.bmf"
+h2="simple_octo.bmf"
+h3="simple_underline.bmf"
+h4="simplest.bmf"
+h5="simplest.bmf"
+h6="simplest.bmf"
 
 # The built-in spacecookie gopherhole server configuration, formerly fulfilled by a
 # spacecookie.json file.

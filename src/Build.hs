@@ -85,12 +85,13 @@ getSourceFiles config sourceDirectory = do
 
 -- FIXME: this may result in the file being read twice.
 -- | Create a `FileRenderRecipe` for rendering a file. Gets a file ready for being built.
-createRenderRecipe :: Config -> FilePath -> FilePath -> Bool -> FilePath -> ContentType -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
+createRenderRecipe :: FilePath -> Config -> FilePath -> FilePath -> Bool -> FilePath -> ContentType -> IO (FileRenderRecipe, Maybe (FrontMatter, T.Text))
 -- contentType argument should be renamed to defaultContentType FIXME
-createRenderRecipe config sourceDirectory destinationDirectory spaceCookie filePath contentType = do
+createRenderRecipe projectRoot config sourceDirectory destinationDirectory spaceCookie filePath contentType = do
   outPath <- finalFilePath
   let defaultRecipe = FileRenderRecipe
-        { frrSourceDirectory = sourceDirectory
+        { frrProjectRoot = projectRoot
+        , frrSourceDirectory = sourceDirectory
         , frrDestinationDirectory = destinationDirectory
         , frrSpacecookie = spaceCookie
         , frrTemplateToRender = sourcePath'
@@ -150,8 +151,8 @@ createRenderRecipe config sourceDirectory destinationDirectory spaceCookie fileP
 
 
 -- FIXME: note that "Skip" means to skip the render process and just copy the file.
-buildFile :: Config -> FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
-buildFile _ sourceDirectory destinationDirectory _ sourceFile@(filePath, SimplyCopy) = do
+buildFile :: FilePath -> Config -> FilePath -> FilePath -> Bool -> SourceFile -> IO FileFrontMatter
+buildFile _ _ sourceDirectory destinationDirectory _ sourceFile@(filePath, SimplyCopy) = do
   -- Don't parse; just copy the file to the target directory.
   let destination = destinationDirectory </> filePath
       destinationDirectory' = takeDirectory destination
@@ -159,8 +160,8 @@ buildFile _ sourceDirectory destinationDirectory _ sourceFile@(filePath, SimplyC
   createDirectoryIfMissing True destinationDirectory'
   copyFile source destination
   pure (fst sourceFile, Nothing)
-buildFile config sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath, RenderEngine contentType) = do
-  (recipe, maybeFrontMatterAndRestOfDoc) <- createRenderRecipe config sourceDirectory destinationDirectory spaceCookie filePath contentType
+buildFile projectRoot config sourceDirectory destinationDirectory spaceCookie sourceFile@(filePath, RenderEngine contentType) = do
+  (recipe, maybeFrontMatterAndRestOfDoc) <- createRenderRecipe projectRoot config sourceDirectory destinationDirectory spaceCookie filePath contentType
   fileText <- case maybeFrontMatterAndRestOfDoc of
                 Nothing -> TIO.readFile (sourceDirectory </> filePath)
                 Just (_, restOfDocument) -> pure restOfDocument
@@ -173,7 +174,7 @@ buildFile config sourceDirectory destinationDirectory spaceCookie sourceFile@(fi
   finalContents <- if frrSkipMarkdown recipe
     then pure testContents
     -- We're using the `ContentType` from the recipe in case it was overridden.
-    else parseMarkdown config (frrBucktooth recipe) (frrContentType recipe) testContents :: IO T.Text
+    else parseMarkdown projectRoot config (frrBucktooth recipe) (frrContentType recipe) testContents :: IO T.Text
 
   let filePathToWriteTo = frrOutPath recipe
   createDirectoryIfMissing True (takeDirectory filePathToWriteTo)
@@ -184,7 +185,9 @@ buildFile config sourceDirectory destinationDirectory spaceCookie sourceFile@(fi
 -- | All the settings for a function (`writeOutBasedOn`) to parse a file
 -- using Commonmark and Mustache.
 data FileRenderRecipe = FileRenderRecipe
-  { frrSourceDirectory :: FilePath
+  { frrProjectRoot :: FilePath
+  -- ^ The (hopefully) absolute path to the gopherhole project's root directory.
+  , frrSourceDirectory :: FilePath
   -- ^ The directory which the main file is from.
   , frrDestinationDirectory :: FilePath
   -- ^ The directory where the file will be going.
@@ -229,33 +232,35 @@ parseMustache mainText recipe = do
   -- which the main template can call as "partial."
   mainTemplate <-
     case frrIncludePartial recipe of
-      Just parentTemplatePath -> newPrepareTemplateUsingParent parentTemplatePath
-      Nothing -> prepareTemplate
+      Just parentTemplatePath -> newPrepareTemplateUsingParent (frrProjectRoot recipe) parentTemplatePath
+      Nothing -> prepareTemplate (frrProjectRoot recipe)
   pure $ substitute mainTemplate $ (Map.fromList $ frrSubstitutions recipe :: Map.Map T.Text Mtype.Value)
  where
   -- | Prepare a template which will insert itself inside a parent template.
   --
   -- Performs a substitution operation for "partial" (in order to put the file
   -- the recipe is for inside of the specified parent template).
-  newPrepareTemplateUsingParent :: FilePath -> IO Template
-  newPrepareTemplateUsingParent parentTemplatePath = do
+  newPrepareTemplateUsingParent :: FilePath -> FilePath -> IO Template
+  newPrepareTemplateUsingParent projectRoot parentTemplatePath = do
     -- we are going to put mainTemplate in the template cache as a partial as "partial" for the parent template!
-    mainTemplate <- automaticCompileText mainText
-    let mainTemplateCache = H.fromList [("partial", mainTemplate)] :: H.HashMap String Template
-    parentTemplate <- compileTemplateWithCache searchSpace mainTemplateCache parentTemplatePath
+    mainTemplate <- automaticCompileText projectRoot mainText
+    let
+      mainTemplateCache = H.fromList [("partial", mainTemplate)] :: H.HashMap String Template
+      newSearchSpace = [projectRoot </> "templates", projectRoot]
+    parentTemplate <- compileTemplateWithCache newSearchSpace mainTemplateCache (projectRoot </> parentTemplatePath)
     case parentTemplate of
-      Left err -> error $ show err
+      Left err -> error $ "Error with file " ++ (projectRoot </> parentTemplatePath) ++ ": " ++ show err
       Right template -> pure template
 
   -- | Prepare a template normally.
-  prepareTemplate :: IO Template
-  prepareTemplate = do
-    mainTemplate <- automaticCompileText mainText
+  prepareTemplate :: FilePath -> IO Template
+  prepareTemplate projectRoot = do
+    mainTemplate <- automaticCompileText projectRoot mainText
     pure mainTemplate
 
-envFromConfig :: Config -> IO Environment
-envFromConfig config = do
-  allTheAsciiFonts <- getAsciiFonts (fonts config)
+envFromConfig :: FilePath -> Config -> IO Environment
+envFromConfig projectRoot config = do
+  allTheAsciiFonts <- getAsciiFonts projectRoot (fonts config)
   let
     host' = host (general config)
     port' = T.pack . show $ port (general config)
@@ -263,21 +268,21 @@ envFromConfig config = do
   pure $ Environment { envFonts = allTheAsciiFonts, envMenuLinks = Just (host', port'), envPreserveLineBreaks = True, envBucktooth = False, envAsciiSafe = asciiSafe' }
 
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
-parseMarkdown :: Config -> Bool -> ContentType -> T.Text -> IO T.Text
-parseMarkdown config _ GopherFileType contents = do
+parseMarkdown :: FilePath -> Config -> Bool -> ContentType -> T.Text -> IO T.Text
+parseMarkdown projectRoot config _ GopherFileType contents = do
   out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherPage))
   case out of
     Left parseError -> error $ show parseError
     Right penv -> do
-      envPending <- envFromConfig config
+      envPending <- envFromConfig projectRoot config
       let env = envPending { envMenuLinks = Nothing, envPreserveLineBreaks = True, envBucktooth = False }
       pure . gopherMenuToText env $ (runReader penv env :: GopherPage)
-parseMarkdown config bucktooth GopherMenuType contents = do
+parseMarkdown projectRoot config bucktooth GopherMenuType contents = do
   out <- commonmarkWith defaultSyntaxSpec "test" contents :: IO (Either ParseError (ParseEnv GopherPage))
   case out of
     Left parseError -> error $ show parseError
     Right penv -> do
-      envPending <- envFromConfig config
+      envPending <- envFromConfig projectRoot config
       -- FIXME: i'm using "parseLinkToGopherFileLink" in the parseOutGopherMenu thingy...
       let env = envPending { envPreserveLineBreaks = True, envBucktooth = bucktooth }
       pure . gopherMenuToText env $ (runReader penv env :: GopherPage)
@@ -294,8 +299,14 @@ buildGopherhole :: FilePath -> Config -> Bool -> IO ()
 buildGopherhole projectRootPath config spaceCookie = do
   let
     sourceDir = projectRootPath </> defaultSourceDirectoryName
-    destDir = T.unpack $ buildPath $ general config
+    -- some logic for teasing out the destination directory
+    rawDestDir = T.unpack $ buildPath $ general config
+    destDir =
+      if take 1 rawDestDir == "/"
+        then rawDestDir
+        else projectRootPath </> rawDestDir
+
   sourceFiles <- getSourceFiles config sourceDir :: IO [SourceFile]
-  filePathFrontMatter <- traverse (buildFile config sourceDir destDir spaceCookie) sourceFiles
+  filePathFrontMatter <- traverse (buildFile projectRootPath config sourceDir destDir spaceCookie) sourceFiles
   renderTagIndexes config filePathFrontMatter
   renderMainPhlogIndex config filePathFrontMatter

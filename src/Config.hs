@@ -5,6 +5,8 @@
 -- TODO when base upgrade: {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RankNTypes #-}
 
 {- | Customization options and possibly internationalization.
 
@@ -18,11 +20,11 @@ altering the gopherhole building process.
 -}
 module Config where
 
-import Data.Text (Text)
+import Data.Text (Text, unpack, pack)
 import GHC.Generics (Generic)
 import Toml
 import System.Directory (canonicalizePath)
-import System.FilePath (splitPath, joinPath)
+import System.FilePath (splitPath, joinPath, (</>))
 import Data.List (findIndex, isSuffixOf)
 
 -- | The name of the config file a gopherhole uses...
@@ -33,6 +35,8 @@ burrowGopherholeDefaultConfigPath = "data/burrow.toml"
 something relative to the config file or the current working directory.
 
 The config file resides in a directory called data/ in the project root.
+
+Also validates...
 
 -}
 getConfigSpecial
@@ -49,15 +53,15 @@ getConfigSpecial maybeConfigPath cwdProjectRoot = do
     then do
       projectRoot <- canonicalizePath "."
       config <- Config.getConfig absConfigPath
-      pure (config, absConfigPath, projectRoot)
+      pure (validateConfig projectRoot config, absConfigPath, projectRoot)
     else
       case ensureInDataDir absConfigPath of
         Nothing -> error $ "Config file must be in a directory named data/, but got: " ++ absConfigPath
         Just projectRoot -> do
           config <- Config.getConfig absConfigPath
-          pure (config, absConfigPath, projectRoot)
+          pure (validateConfig projectRoot config, absConfigPath, projectRoot)
 
--- FIXME
+-- FIXME: what if cwd is data dir
 {- | Ensure the file is inside a "data/" directory and get the parent directory of "data/"
 
 >>> ensureInDataDir "data/burrow.toml"
@@ -146,3 +150,32 @@ configCodec =
 
 getConfig :: FilePath -> IO Config
 getConfig configFilePath = Toml.decodeFile configCodec configFilePath
+
+{- | For now this just tweaks the config to be more consistent and friendly, including
+using absolute paths for some items.
+
+If this is not used, certain paths may have unexpected results, things may get written to
+unexpected places, etc.
+
+More will get moved to here because paths are done in a very manual way right now. There
+will also be a dynamic solution to this problem and I think filepaths that change will get
+their own type.
+
+It dpeends on how much validation I want to do for the config file.
+-}
+validateConfig
+  :: FilePath
+  -- ^ The project root.
+  -> Config
+  -- ^ The config to validate.
+  -> Config
+validateConfig projectRoot config = do
+  let buildPath' = validatePath projectRoot (unpack $ buildPath $ general config)
+  config { general = (general config) { buildPath = pack buildPath' } }
+
+{- | Tool for validating a path from the config file. -}
+validatePath :: FilePath -> FilePath -> FilePath
+validatePath projectRoot path = do
+  if take 1 path == "/"
+    then path
+    else projectRoot </> path
