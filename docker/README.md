@@ -8,6 +8,7 @@ Serve and build a gopherhole using Burrow. Features:
   * Periodically check a remote repo and build from that (ex: push to GitHub, wait, see gopherhole update)
 
 * git server you can push to, which will trigger a rebuild+restart of your gopherhole
+  (including reloading Burrow in case the project's `toml` config changes)
 
 This Docker config is set up so you run commands from the project root.
 
