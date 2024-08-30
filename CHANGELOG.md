@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0.0] - 2024-08-30
+
+Was fixated on Docker.
+
 ### Fixed
 
 * `--watch` will now build the gopherhole before any changes
@@ -102,7 +106,8 @@ Nix is no longer used.
 
 I didn't account for many of the previous versions up to (inclusive) v0.1.14.0.
 
-[unreleased]: https://github.com/someodd/burrow/compare/v0.9.0.0...HEAD
+[unreleased]: https://github.com/someodd/burrow/compare/v0.10.0.0...HEAD
+[0.10.0.0]: https://github.com/someodd/burrow/compare/v0.9.0.0...v0.10.0.0
 [0.9.0.0]: https://github.com/someodd/burrow/compare/v0.8.0.0...v0.9.0.0
 [0.8.0.0]: https://github.com/someodd/burrow/compare/v0.7.0.0...v0.8.0.0
 [0.7.0.0]: https://github.com/someodd/burrow/compare/v0.6.0.0...v0.7.0.0
