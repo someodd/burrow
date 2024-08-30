@@ -27,3 +27,6 @@ else
     echo "Failed to download $FILENAME"
     exit 1
 fi
+
+# Install the .deb file
+apt-get install -y "/tmp/burrow.deb"

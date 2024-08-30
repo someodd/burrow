@@ -2,24 +2,32 @@
 
 Docker config to serve a gopherhole built with Burrow. Features:
 
-* `SYNC_MODE` (read section below)
+* Special modes (see section below)!
+
+  * Automatically upgrade Burrow (this is an unstable option for those living on the edge)
+  * Periodically check a remote repo and build from that (ex: push to GitHub, wait, see gopherhole update)
+
 * git server you can push to, which will trigger a rebuild+restart of your gopherhole
 
 This Docker config is set up so you run commands from the project root.
 
-## Preparation: SYNC_MODE, envvars
+## Special modes
 
-* `SYNC_MODE` (a Docker build argument): if set to `true` will:
-  * catch up the container's gopherhole repo to a defined repo on GitHub, whenever a new commit is detected
-  * automatically update Burrow *unless* the `SKIP_BURROW_UPDATES` environmental variable is set to `1`
-  * **Have a known bug** where if the remote github repo has a different version, the container's repo will
-    still get synched to it regardless of which is newer
-* Be sure to edit/look at the `.env` file if you're going to use `SYNC_MODE`!
+Use the optional `--CRON_TIME` Docker build arg if you want to override the cron time.
+
+Some variables to set in an `.env` (please see the example `.env` file included):
+
+* `AUTO_BURROW_UPGRADE`: If set to `true` try to (automatically) upgrade Burrow on the `CRON_TIME` schedule
+* `GOPHERHOLE_REMOTE_URL`: If set to a remote git repository HTTP(s) URI, ensure "everything" is up-to-date with it.
+
+  * An optional `GOPHERHOLE_REMOTE_BRANCH` (defaulting to `main`) defines the remote branch to check against.
 
 ## Build and run
 
+Make sure you've created a Docker network (example used below is `--net docker_default`).
+
 ```
-docker build --build-arg ENABLE_CRON=true -t spacecookie -f docker/Dockerfile docker/
+docker build --build-arg CRON_TIME="0 * * * *" -t spacecookie -f docker/Dockerfile docker/ --no-cache
 docker run --env-file docker/.env -d --restart=always --net docker_default --hostname=spacecookie --ip=172.18.0.68 -p 7071:7071 -p 2222:22 spacecookie
 ```
 ## Makefile
@@ -83,24 +91,4 @@ $ git remote add gopherhole git@gopherhole:/srv/git/gopherhole.git
 $ git remote add origin git@github.com:someodd/personal-gopherhole.git # optional! set to GH repo you made for your gopherhole
 $ git push # optional! pushes to github
 $ git push gopherhole
-```
-
-## Optional: Using Tor
-
-Just some notes in case you want to make your gopherhole a hidden service.
-
-### Client config
-
-On the client machine you may want to `torsocks push gopherhole`.
-
-You may want to set the `HostName` entry on your client machine to your onion address.
-
-### Server config
-
-On the machine hosting the Docker service, edit your `/etc/tor/torrc/` (but match the IP
-and ports used by the Docker container):
-
-```
-HiddenServicePort 70 172.18.0.68:70
-HiddenServicePort 22 172.18.0.68:22
 ```

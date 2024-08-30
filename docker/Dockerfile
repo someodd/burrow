@@ -8,9 +8,12 @@ ADD burrow.toml /etc/burrow.toml
 RUN mkdir -p /srv/gopher
 
 # FIXME: if i don't do this hgetfilecontents or whatever will fail
+# Ensure locale is set to UTF-8
 RUN apt-get install -y locales
 RUN echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
 RUN locale-gen
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # The git server
 RUN adduser --disabled-password --gecos "" git
@@ -42,10 +45,9 @@ RUN chsh -s /usr/bin/git-shell git
 
 # now add a server-side git hook for burrow
 RUN apt-get install -y wget
-ADD latest-deb.sh /tmp/latest-deb.sh
-RUN chmod +x /tmp/latest-deb.sh
-RUN /tmp/latest-deb.sh
-RUN apt-get install /tmp/burrow.deb
+ADD install-latest-deb.sh /usr/local/bin/install-latest-deb.sh
+RUN chmod +x /usr/local/bin/install-latest-deb.sh
+RUN /usr/local/bin/install-latest-deb.sh
 
 RUN apt-get install -y openssh-server
 RUN service ssh start
@@ -55,14 +57,19 @@ RUN apt-get install -y cron
 ADD auto_update.sh /usr/local/bin/auto_update.sh
 RUN chmod +x /usr/local/bin/auto_update.sh
 
-# Add crontab entry if the flag is set
-ARG SYNC_MODE=false
-RUN if [ "$SYNC_MODE" = "true" ]; then \
-    echo "0 * * * * /usr/local/bin/auto_update.sh" > /etc/cron.d/check_updates; \
+# Special mode(s)
+ARG CRON_TIME="0 * * * *"
+ADD .env /tmp/.env
+RUN set -a && \
+    . /tmp/.env && \
+    set +a && \
+    if [ "$AUTO_BURROW_UPGRADE" = "true" ] || [ -z $GOPHERHOLE_REMOTE_URL ]; then \
+    echo "$CRON_TIME /usr/local/bin/auto_update.sh" > /etc/cron.d/check_updates; \
     chmod 0644 /etc/cron.d/check_updates; \
     crontab /etc/cron.d/check_updates; \
     service cron start; \
-fi
+    /usr/local/bin/auto_update.sh; \
+    fi
 
 EXPOSE 7071
 EXPOSE 2222
