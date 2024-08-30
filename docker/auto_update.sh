@@ -84,3 +84,8 @@ if [[ -n $GOPHERHOLE_REMOTE_URL ]] && [[ $is_newer -eq 0 ]]; then
     git fetch "$GOPHERHOLE_REMOTE_URL" "$GOPHERHOLE_REMOTE_BRANCH:$GOPHERHOLE_REMOTE_BRANCH" --force
     "$LOCAL_GOPHERHOLE_REPO_PATH/hooks/post-receive"
 fi
+
+# Reset perms
+chown -R git:git /srv/git
+chown -R git:git /srv/gopher
+chown -R git:git /srv

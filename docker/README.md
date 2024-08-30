@@ -1,6 +1,6 @@
 # Burrow Docker setup
 
-Docker config to serve a gopherhole built with Burrow. Features:
+Serve and build a gopherhole using Burrow. Features:
 
 * Special modes (see section below)!
 
@@ -30,6 +30,7 @@ Make sure you've created a Docker network (example used below is `--net docker_d
 docker build --build-arg CRON_TIME="0 * * * *" -t spacecookie -f docker/Dockerfile docker/ --no-cache
 docker run --env-file docker/.env -d --restart=always --net docker_default --hostname=spacecookie --ip=172.18.0.68 -p 7071:7071 -p 2222:22 spacecookie
 ```
+
 ## Makefile
 
 A `Makefile` is included for your convenience:
