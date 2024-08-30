@@ -9,8 +9,8 @@ version:        0.9.0.0
 synopsis:       Build gopherholes.
 description:    Static site builder, but for gopherholes. Manage phlogs with tags, use the Markdown renderer and Mustache templating system.
 category:       Network
-homepage:       https://github.com/hyperrealgopher/burrow
-bug-reports:    https://github.com/hyperrealgopher/burrow/issues
+homepage:       https://github.com/someodd/burrow
+bug-reports:    https://github.com/someodd/burrow/issues
 author:         someodd
 maintainer:     someodd@pm.pm
 license:        GPL-3.0-only

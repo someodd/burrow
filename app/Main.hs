@@ -71,6 +71,9 @@ then rebuild the gopherhole.
 -}
 watchServe :: FilePath -> FilePath -> Config.Config -> IO ()
 watchServe configFilePath projectRootPath config = do
+  putStrLn "Building first..."
+  buildGopherhole projectRootPath config True
+
   putStrLn "Starting the server..."
   let sourceDirectoryPath = projectRootPath </> defaultSourceDirectoryName
 

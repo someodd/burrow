@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+* `--watch` will now build the gopherhole before any changes
+
 ## [0.9.0.0] - 2024-08-26
 
 Project root release.
