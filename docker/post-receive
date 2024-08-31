@@ -5,4 +5,3 @@ git clone /srv/git/gopherhole.git /tmp/gopherhole-clone
 burrow build --config /tmp/gopherhole-clone/data/burrow.toml
 pkill burrow
 nohup burrow serve --config /tmp/gopherhole-clone/data/burrow.toml > /dev/null 2>&1 &
-rm -rf /tmp/gopherhole-clone
