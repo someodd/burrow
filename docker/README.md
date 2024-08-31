@@ -32,6 +32,8 @@ docker build --build-arg CRON_TIME="0 * * * *" -t spacecookie -f docker/Dockerfi
 docker run --env-file docker/.env -d --restart=always --net docker_default --hostname=spacecookie --ip=172.18.0.68 -p 7071:7071 -p 2222:22 spacecookie
 ```
 
+Make sure to push a commit to the container, or you might not see any changes!
+
 ## Makefile
 
 A `Makefile` is included for your convenience:

@@ -4,7 +4,8 @@ MAINTAINER someodd, https://github.com/someodd
 RUN apt-get update
 RUN apt-get install -y git
 RUN useradd spacecookie
-ADD burrow.toml /etc/burrow.toml
+RUN mkdir /tmp/data/
+ADD burrow.toml /tmp/data/burrow.toml
 RUN mkdir -p /srv/gopher
 
 # FIXME: if i don't do this hgetfilecontents or whatever will fail
@@ -68,7 +69,6 @@ RUN set -a && \
     chmod 0644 /etc/cron.d/check_updates; \
     crontab /etc/cron.d/check_updates; \
     service cron start; \
-    /usr/local/bin/auto_update.sh; \
     fi
 
 EXPOSE 7071
