@@ -16,7 +16,9 @@ import Text.Mustache.Parser
 import qualified Text.Mustache.Types as Mtype
 
 import TextUtils
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeFileName)
+import TextUtils.Containers (AsciiBoxConfig, applyContainer)
+import qualified Data.Bifunctor
 
 -- FIXME: will get removed
 -- | This is where Mustache will look for files, especially for partials.
@@ -61,6 +63,23 @@ getCompiledTemplate searchSpace' templateToRenderPath = do
     Left err -> error $ show err
     Right template -> pure template
 
+-- fix me
+mustacheContainerize :: MustacheCachedContainers -> T.Text -> T.Text
+mustacheContainerize containers text = do
+  let (filePath, rest) = T.breakOn " " text
+      (spaces, body) = T.breakOn " " (T.drop 1 rest) -- drop the first space
+      body' = T.drop 1 body -- drop the second space
+      wrapCodeBlock = spaces == "1"
+  let box = lookup (T.unpack filePath) (map (Data.Bifunctor.first takeFileName) containers)
+  case box of
+    Nothing -> error $ "No box found for: " ++ T.unpack filePath ++ show containers
+    Just box' ->
+      if wrapCodeBlock
+        then "```\n" <> (applyContainer box' body') <> "\n```"
+        else (applyContainer box' body')
+
+-- | filepath should just be filename
+type MustacheCachedContainers = [(FilePath, AsciiBoxConfig)]
 
 -- | Global variables which can be access by a Mustache file being parsed.
 --
@@ -69,9 +88,10 @@ getCompiledTemplate searchSpace' templateToRenderPath = do
 --
 -- These substitutions are later modified to include a Mustache partial for
 -- the Burrow template/partial system.
-dataForMustache :: [(T.Text, Mtype.Value)]
-dataForMustache =
-  [ ("justify2", overText justify2)
-  , ("justify", overText justify')
-  , ("columnate2", overText columnate2)
-  ]
+dataForMustache :: MustacheCachedContainers -> [(T.Text, Mtype.Value)]
+dataForMustache containers =
+    [ ("justify2", overText justify2)
+    , ("justify", overText justify')
+    , ("columnate2", overText columnate2)
+    , ("containerize", overText (mustacheContainerize containers))
+    ]

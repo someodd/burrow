@@ -11,7 +11,7 @@ module TextUtils.Headings
   ( HeadingLevelFontMap
   , AsciiFont
   , headingCompose
-  , getAsciiFonts
+  , parseFont
   )
 where
 
@@ -21,10 +21,8 @@ import Data.List (transpose, intercalate)
 import Data.List.Split (splitOn)
 import qualified Data.Map as Map
 
-import Config
 import Data.Maybe (listToMaybe, catMaybes, isJust)
 import Data.Foldable (traverse_)
-import Data.Text (unpack)
 import System.FilePath ((</>))
 
 
@@ -124,26 +122,6 @@ type HeadingLevelFontMap = Map.Map Int AsciiFont
 -- | The default path to fonts, relative to the project root.
 relativeFontsPath :: FilePath
 relativeFontsPath = "data/fonts/"
-
--- FIXME: if defined more than once, will load in the same fonts over and over!
--- | Get all the fonts loaded, mapped to a specific heading level,
--- according to the configuration file.
-getAsciiFonts :: FilePath -> FontsConfig -> IO HeadingLevelFontMap
-getAsciiFonts projectRoot fontsConfig = do
-  let func level = pure (getFontByLevel level) >>= parseFont projectRoot >>= pure . (,) level
-  result <- traverse func [1..6]
-  pure $ Map.fromList result
- where
-  -- Helper function to get the font value based on the level
-  getFontByLevel :: Int -> FilePath
-  getFontByLevel level = unpack $ case level of
-    1 -> h1 fontsConfig
-    2 -> h2 fontsConfig
-    3 -> h3 fontsConfig
-    4 -> h4 fontsConfig
-    5 -> h5 fontsConfig
-    6 -> h6 fontsConfig
-    _ -> error "Invalid heading level"
 
 -- SHOULD DOCUMENT THE BEHAVIOR OF LOOKING UP. if failure to look up the requested case
 -- then get the opposite.

@@ -1,8 +1,8 @@
 # Gopherhole builder configuration for Burrow.
 
 # The ASCII art font files used for each heading level.
-[fonts]
-h1="figlet_graceful.bmf"
+[headings]
+h1="basic.abx"
 h2="simple_octo.bmf"
 h3="simple_underline.bmf"
 h4="simplest.bmf"

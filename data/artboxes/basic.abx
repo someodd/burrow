@@ -1,0 +1,23 @@
+[dimensions]
+maxWidth = 100
+minWidth = 50
+paddingTop = 3
+paddingBottom = 2
+paddingLeft = 2
+paddingRight = 2
+
+[borders]
+top = "─*─"
+bottom = "──"
+left = ["║1", "║2*", "║3"]
+right = ["1║", "*2║", "3║"]
+
+[corner]
+cornerTopLeft = "╔"
+cornerTopRight = "╗"
+cornerBottomLeft = "╚"
+cornerBottomRight = "╝"
+
+[text]
+alignment = "right"
+filler = "."

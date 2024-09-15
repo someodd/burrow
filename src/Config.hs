@@ -86,7 +86,7 @@ getConfigOrDefault maybeConfigPath = do
   config <- getConfig filePath
   pure (config, filePath)
 
-data FontsConfig = FontsConfig
+data HeadingsConfig = FontsConfig
   { h1 :: Text
   , h2 :: Text
   , h3 :: Text
@@ -95,8 +95,8 @@ data FontsConfig = FontsConfig
   , h6 :: Text
   } deriving (Generic, Show, Eq)
 
-fontsConfigCodec :: TomlCodec FontsConfig
-fontsConfigCodec = Toml.genericCodec
+headingsConfigCodec :: TomlCodec HeadingsConfig
+headingsConfigCodec = Toml.genericCodec
 
 data PhlogConfig = PhlogConfig
   { phlogPath :: Text
@@ -133,7 +133,7 @@ spacecookieConfigCodec :: TomlCodec SpacecookieConfig
 spacecookieConfigCodec = Toml.genericCodec
 
 data Config = Config
-    { fonts :: FontsConfig
+    { headings :: HeadingsConfig
     , phlog :: PhlogConfig
     , general :: GeneralConfig
     , spacecookie :: SpacecookieConfig
@@ -143,7 +143,7 @@ data Config = Config
 configCodec :: TomlCodec Config
 configCodec =
     Config
-        <$> Toml.table fontsConfigCodec "fonts" .= fonts
+        <$> Toml.table headingsConfigCodec "headings" .= headings
         <*> Toml.table phlogConfigCodec "phlog" .= phlog
         <*> Toml.table generalConfigCodec "general" .= general
         <*> Toml.table spacecookieConfigCodec "spacecookie" .= spacecookie

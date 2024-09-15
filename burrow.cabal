@@ -38,6 +38,7 @@ library
       Phlog
       Types
   other-modules:
+      TextUtils.Containers
       Paths_burrow
   autogen-modules:
       Paths_burrow

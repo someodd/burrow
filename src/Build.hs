@@ -22,7 +22,7 @@ import Data.Maybe (fromMaybe)
 import System.Directory (copyFile)
 import qualified Data.HashMap.Strict as H
 import Data.List (isSuffixOf)
-import System.FilePath (takeFileName, takeDirectory, (</>), (<.>), isExtensionOf)
+import System.FilePath (takeFileName, takeDirectory, (</>), (<.>), isExtensionOf, takeExtension)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -43,6 +43,7 @@ import Phlog (renderTagIndexes, renderMainPhlogIndex, FrontMatter(..), getFrontM
 import TextUtils.Headings
 import Markdown
 import Mustache
+import TextUtils.Containers (loadAsciiBox, loadAllAsciiBoxes, AsciiBoxConfig)
 
 
 -- | Relative to a project root, the directory name containing the source to build.
@@ -89,6 +90,7 @@ createRenderRecipe :: FilePath -> Config -> FilePath -> FilePath -> Bool -> File
 -- contentType argument should be renamed to defaultContentType FIXME
 createRenderRecipe projectRoot config sourceDirectory destinationDirectory spaceCookie filePath contentType = do
   outPath <- finalFilePath
+  allBoxes <- loadAllAsciiBoxes projectRoot
   let defaultRecipe = FileRenderRecipe
         { frrProjectRoot = projectRoot
         , frrSourceDirectory = sourceDirectory
@@ -99,7 +101,7 @@ createRenderRecipe projectRoot config sourceDirectory destinationDirectory space
         , frrOutPath = outPath
         , frrBucktooth = takeFileName outPath == ".gophermap"
         , frrIncludePartial = Nothing
-        , frrSubstitutions = dataForMustache
+        , frrSubstitutions = dataForMustache allBoxes
         , frrSkipMustache = False
         , frrSkipMarkdown = False
         }
@@ -112,7 +114,7 @@ createRenderRecipe projectRoot config sourceDirectory destinationDirectory space
                    Nothing -> contentType
   let variablePairs = toVariablePairs config <$> frontMatter
   let recipeFrontMatterChanges = defaultRecipe
-        { frrSubstitutions = dataForMustacheWithFrontmatter frontMatter variablePairs
+        { frrSubstitutions = dataForMustacheWithFrontmatter allBoxes frontMatter variablePairs
         , frrContentType = renderAs
         , frrSkipMustache = fromMaybe False (frontMatter >>= fmSkipMustache >>= Just :: Maybe Bool)
         , frrSkipMarkdown = fromMaybe False (frontMatter >>= fmSkipMarkdown >>= Just :: Maybe Bool)
@@ -124,7 +126,7 @@ createRenderRecipe projectRoot config sourceDirectory destinationDirectory space
     Just templateName ->
       let partial'sTemplatePath = "templates" </> templateName
         -- FIXME, TODO: it feels like this is being done twice!
-          newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter frontMatter variablePairs
+          newDataForMustache = ("partial", Mtype.String restOfDocument):dataForMustacheWithFrontmatter allBoxes frontMatter variablePairs
           recipe = recipeFrontMatterChanges { frrIncludePartial = Just partial'sTemplatePath, frrSubstitutions = newDataForMustache }
       in pure (recipe, frontMatterReturnPair frontMatter)
  where
@@ -134,9 +136,9 @@ createRenderRecipe projectRoot config sourceDirectory destinationDirectory space
   outputPath :: FilePath
   outputPath = destinationDirectory </> filePath
 
-  dataForMustacheWithFrontmatter :: Maybe FrontMatter -> Maybe [(T.Text, T.Text)] -> [(T.Text, Mtype.Value)]
-  dataForMustacheWithFrontmatter maybeFrontMatter variablePairs =
-    let hardcodedFrontMatterVars = fromMaybe [] (variablePairs >>= Just . map (id . fst &&& Mtype.String . snd)) ++ dataForMustache
+  dataForMustacheWithFrontmatter :: [(FilePath, AsciiBoxConfig)] -> Maybe FrontMatter -> Maybe [(T.Text, T.Text)] -> [(T.Text, Mtype.Value)]
+  dataForMustacheWithFrontmatter allBoxes maybeFrontMatter variablePairs =
+    let hardcodedFrontMatterVars = fromMaybe [] (variablePairs >>= Just . map (id . fst &&& Mtype.String . snd)) ++ (dataForMustache allBoxes)
         userFrontMatterVars = fromMaybe [] ( maybeFrontMatter >>= \fm -> fmap (Map.toList . Map.map (Mtype.String)) $ fmVariables fm ) :: [(T.Text, Mtype.Value)]
     in hardcodedFrontMatterVars ++ userFrontMatterVars
 
@@ -258,14 +260,41 @@ parseMustache mainText recipe = do
     mainTemplate <- automaticCompileText projectRoot mainText
     pure mainTemplate
 
+
+
+-- FIXME: if defined more than once, will load in the same fonts over and over!
+-- | Get all the fonts loaded, mapped to a specific heading level,
+-- according to the configuration file.
+getHeadings :: FilePath -> HeadingsConfig -> IO (Map.Map Int SupportedHeading)
+getHeadings projectRoot headingsConfig = do
+  let func level = do
+        let fontPath = getFontByLevel level
+        case takeExtension fontPath of
+          ".bmf" -> CachedFont <$> parseFont projectRoot fontPath >>= pure . (,) level
+          ".abx" -> CachedContainer <$> loadAsciiBox projectRoot fontPath >>= pure . (,) level
+          _      -> error $ "Unsupported file type for font: " ++ fontPath
+  result <- traverse func [1..6]
+  pure $ Map.fromList result
+ where
+  -- Helper function to get the font value based on the level
+  getFontByLevel :: Int -> FilePath
+  getFontByLevel level = T.unpack $ case level of
+    1 -> h1 headingsConfig
+    2 -> h2 headingsConfig
+    3 -> h3 headingsConfig
+    4 -> h4 headingsConfig
+    5 -> h5 headingsConfig
+    6 -> h6 headingsConfig
+    _ -> error "Invalid heading level"
+
 envFromConfig :: FilePath -> Config -> IO Environment
 envFromConfig projectRoot config = do
-  allTheAsciiFonts <- getAsciiFonts projectRoot (fonts config)
+  allTheHeadingFiles <- getHeadings projectRoot (headings config)
   let
     host' = host (general config)
     port' = T.pack . show $ port (general config)
     asciiSafe' = asciiSafe (general config)
-  pure $ Environment { envFonts = allTheAsciiFonts, envMenuLinks = Just (host', port'), envPreserveLineBreaks = True, envBucktooth = False, envAsciiSafe = asciiSafe' }
+  pure $ Environment { envHeadingFiles = allTheHeadingFiles, envMenuLinks = Just (host', port'), envPreserveLineBreaks = True, envBucktooth = False, envAsciiSafe = asciiSafe' }
 
 -- | Needs IO mainly for the font files. Could be made IO-free if fonts were loaded prior.
 parseMarkdown :: FilePath -> Config -> Bool -> ContentType -> T.Text -> IO T.Text

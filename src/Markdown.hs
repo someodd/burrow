@@ -13,6 +13,7 @@ module Markdown
   , gopherMenuToText
   , ParseEnv
   , GopherPage(..)
+  , SupportedHeading(..)
   ) where
 
 import Network.URI
@@ -37,7 +38,9 @@ import System.FilePath (takeExtension)
 
 import TextUtils.Headings
 import TextUtils (italicize, embolden)
+import TextUtils.Containers (AsciiBoxConfig, applyContainer)
 
+data SupportedHeading = CachedFont AsciiFont | CachedContainer AsciiBoxConfig
 
 -- | Stuff to make available to the parser.
 --
@@ -45,7 +48,7 @@ import TextUtils (italicize, embolden)
 -- redundant. If anything could be called MarkdownRecipe or MarkdownStyles or something.
 data Environment =
   Environment
-    { envFonts :: HeadingLevelFontMap
+    { envHeadingFiles :: Map.Map Int SupportedHeading
     -- ^ Used to render headings.
     , envMenuLinks :: Maybe (Text, Text)
     -- ^ If nothing will assume a plain text file, won't do anything particular
@@ -72,13 +75,16 @@ type ParseEnv a = Reader Environment a
 
 
 -- | Parse a Markdown heading into a fancy, beautiful ASCII art heading.
-parseHeading' :: Int -> HeadingLevelFontMap -> Text -> Text
-parseHeading' level fonts ils = T.pack $ headingCompose font $ show ils
- where
-  font =
-    case Map.lookup level fonts of
-      Just x -> x
-      Nothing -> error $ "No font for level: " ++ show level
+parseHeading' :: Int -> Map.Map Int SupportedHeading -> Text -> Text
+parseHeading' level headings ils = do
+  let
+    headingStyle =
+      case Map.lookup level headings of
+        Just x -> x
+        Nothing -> error $ "No heading style defined for level: " ++ show level
+  case headingStyle of
+    CachedFont f -> T.pack $ headingCompose f $ show ils
+    CachedContainer f -> applyContainer f ils
 
 
 -- | Represents a gpohermap/menu link of (item type, label, resource/magic
@@ -467,8 +473,8 @@ instance IsInline (ParseEnv GopherPage) => IsBlock (ParseEnv GopherPage) (ParseE
     case gopher of
       (Block ils) -> do
         environment <- ask
-        let fonts = envFonts environment
-        pure $ Block $ [GopherNewLine, GopherNewLine] ++ formattedHeader fonts ils ++ [GopherNewLine, GopherNewLine]
+        let headingFiles = envHeadingFiles environment
+        pure $ Block $ [GopherNewLine, GopherNewLine] ++ formattedHeader headingFiles ils ++ [GopherNewLine, GopherNewLine]
       NullBlock -> pure NullBlock
    where
     headerText ils =

@@ -2,7 +2,7 @@
 
 {{> header.txt }}
 
-This menu is called "{{$title}}."
+This menu is called "{{title}}."
 
 {{ variableTest }}
 
