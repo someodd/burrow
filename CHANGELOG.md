@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* "Containers" which are a way to draw an ASCII art frame around some textual content
+
 ## [0.10.0.0] - 2024-08-30
 
 Was fixated on Docker.

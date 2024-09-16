@@ -1,7 +1,10 @@
 {{! For Phlog posts. }}
 
+{{#containerize}}
+basic.abx 1 
 # {{ title}}
 
 {{> meta.txt }}
 
 {{> partial}}
+{{/containerize}}

@@ -11,6 +11,7 @@ import System.FilePath ((</>))
 import System.Directory (listDirectory)
 import Data.List (isSuffixOf)
 import Control.Monad (forM)
+import TextUtils (justifyDependencyPreformatted)
 
 -- Data type for the 'dimensions' section
 data DimensionsConfig = DimensionsConfig
@@ -106,7 +107,7 @@ applyContainer box body =
                       - maxRightBorderWidth
 
         -- Add padding to each line of text and align according to the alignment rule
-        paddedLines = map (padAndAlign box usableWidth) bodyLines
+        paddedLines = concatMap (T.lines . padAndAlign box usableWidth) bodyLines
 
         -- Apply left and right borders to each line, adding padding as necessary
         borderedLines = zipWith (applySideBorders box maxLeftBorderWidth maxRightBorderWidth usableWidth) [paddingTop (dimensions box)..] paddedLines
@@ -161,6 +162,7 @@ padAndAlign box width text' =
         "left"   -> justifyLeft width fillerChar text'
         "right"  -> justifyRight width fillerChar text'
         "center" -> center width fillerChar text'
+        "justify" -> justifyDependencyPreformatted width text'
         _        -> justifyLeft width fillerChar text'  -- Default to left alignment
 
 -- Define justifyLeft, justifyRight, and center functions
@@ -187,6 +189,7 @@ center n c t =
        let totalPadding = n - len
            (leftPadding, rightPadding) = (totalPadding `div` 2, totalPadding - totalPadding `div` 2)
        in T.replicate leftPadding (T.singleton c) <> t <> T.replicate rightPadding (T.singleton c)
+
 
 artboxesRelativePath :: FilePath
 artboxesRelativePath = "data/artboxes/"

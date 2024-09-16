@@ -6,6 +6,7 @@
 module TextUtils
   ( justify2
   , justify'
+  , justifyDependencyPreformatted
   , columnate2
   , italicize
   , embolden
@@ -73,6 +74,12 @@ embolden text =
 maxWidth :: Int
 maxWidth = 79
 
+-- | Dependency version of justify, allowing for width. assumes preformatted linebreaks (fix them).
+justifyDependencyPreformatted :: Int -> Text.Text -> Text.Text
+justifyDependencyPreformatted paragraphWidth text = Text.strip $ Text.pack . unlines $ Justify.justifyText paragraphWidth (unlines wrappedLines)
+ where
+  wrapSettings = WrapSettings { preserveIndentation = False, breakLongWords = True }
+  wrappedLines = map Text.unpack $ wrapTextToLines wrapSettings paragraphWidth text
 
 -- TODO: should hyphenate break long words
 -- | Mustache-lambda-friendly function for text justification.

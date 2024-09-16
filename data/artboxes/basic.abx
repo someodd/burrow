@@ -19,5 +19,5 @@ cornerBottomLeft = "╚"
 cornerBottomRight = "╝"
 
 [text]
-alignment = "right"
+alignment = "justify"
 filler = "."

@@ -5,6 +5,7 @@ updated: 2021-07-03
 tags: notes linux debian server cli terminals
 type: post
 parentTemplate: post.txt
+skipMarkdown: true
 ---
 
 I love GNU screen. It allows me to keep various sessions open regardless if my
