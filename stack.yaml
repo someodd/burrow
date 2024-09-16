@@ -72,5 +72,5 @@ extra-deps:
 # compiler-check: newer-minor
 
 # Temporarily disabling this because it yields an error
-# build:
-#  haddock: true
+build:
+  haddock: true

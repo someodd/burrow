@@ -76,7 +76,7 @@ pairToPostMeta (filePath, Just frontMatter) = Just $ PostMeta
   , metaPath = T.pack filePath
   , metaTitle = fromJust $ fmTitle frontMatter
   , metaAuthor = fmAuthor frontMatter
-  -- ^ Can be Nothing because of default author entry in .ini
+  -- metaAuthor can be Nothing because of default author entry in .ini
   , metaTags = fmTags frontMatter
   , metaFrontMatter = frontMatter
   }
@@ -252,11 +252,6 @@ instance PhlogIndex [PostMeta] MainPhlogIndex where
       pure $ postMetasPairs
 
   renderIndexGophermap config (MainPhlogIndex mainPhlogIndex) = do
-    -- TODO: list main tag index
-    -- TODO: 
-    --  createDirectoryIfMissing True (takeDirectory mainTagIndexPath)
-    -- FIXME: directories need to be defined in config
-    -- | Create the main phlog index which includes all the posts sorted by date.
     currentYear <- getCurrentYear
     let
       buildPath = T.unpack $ Config.buildPath (Config.general config)

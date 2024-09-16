@@ -1,7 +1,8 @@
--- TODO: maybe columnate stuff should get its own TextUtils.Columnate function!
--- | Special text formatting functions to make pretty files and menus in gopherspace.
---
--- Mostly gets used as Mustache lambdas.
+{- | Text manipulation, including ASCII art type functions.
+
+Functions for manipulating text documents with presentation in gopherspace in mind.
+
+-}
 {-# LANGUAGE OverloadedStrings          #-}
 module TextUtils
   ( justify2
