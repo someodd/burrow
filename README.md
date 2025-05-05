@@ -1,5 +1,7 @@
 # Burrow: Make Gopherholes
 
+Archived: I am no longer maintaining this project because I created [Bore](https://github.com/someodd/bore)! Please check it out!
+
 Burrow is to gopherholes as static site builders are to websites.
 
 Burrow is a *static site generator,* but for gopherholes. A *gopherhole* is a place in *gopherspace* accessed through the [Gopher protocol](https://en.wikipedia.org/wiki/Gopher_%28protocol%29)).
